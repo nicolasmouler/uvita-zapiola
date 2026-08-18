@@ -7,6 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0f1720">
 <title>Seguimiento Crédito Hipotecario UVA</title>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
 <style>
   :root{
     --bg:#0f1720; --panel:#141f2b; --panel2:#182634; --border:#233241;
@@ -181,10 +183,13 @@
 <section>
   <div class="panel">
     <div class="flexhead">
-      <h3>🔄 Sincronización compartida</h3>
+      <h3>🔄 Sincronización en tiempo real</h3>
       <span id="syncStatus" class="src"></span>
     </div>
-    <div id="syncSetup"></div>
+    <div class="uvarow">
+      <button class="secondary" id="refreshNowBtn">🔄 Actualizar ahora</button>
+      <button class="secondary" id="toggleSyncBtn">Pausar sincronización en este dispositivo</button>
+    </div>
     <details style="margin-top:10px;">
       <summary style="cursor:pointer;color:var(--muted);font-size:.78rem;">Diagnóstico técnico</summary>
       <div class="uvarow" style="margin-top:10px;">
@@ -195,11 +200,10 @@
         margin:8px 0 0;">Sin actividad todavía.</pre>
     </details>
     <small class="note">
-      Esta copia ya viene conectada automáticamente al grupo compartido — cualquiera que abra este link ve y
-      actualiza los mismos datos (valores UVA cargados y cuotas marcadas como pagadas), sin tener que crear ni
-      pegar ningún código. Se actualiza sola cada 15 segundos, o al tocar "🔄 Actualizar ahora". El código no tiene
-      contraseña: cualquiera con el link puede ver y modificar estos datos, así que no lo compartas fuera de quien
-      corresponda. Si alguna vez necesitás desvincular este dispositivo del grupo, usá "Dejar de sincronizar" más abajo.
+      Cualquiera que abra este link ve y actualiza los mismos datos (valores UVA cargados y cuotas marcadas como
+      pagadas) al instante, sin crear ni pegar ningún código — todas las copias de este archivo comparten la misma
+      base de datos. No tiene contraseña propia (más allá del acceso a la página): cualquiera con el link puede ver
+      y modificar estos datos, así que no lo compartas fuera de quien corresponda.
     </small>
   </div>
 </section>
@@ -413,41 +417,39 @@ function loadStorage(){
 
 function saveUvaValue(iso, valor){
   userValues[iso] = {valor};
-  const local = storage.set('uva:'+iso, JSON.stringify(userValues[iso]), false).catch(()=>{});
-  const cloud = syncBucket
-    ? kvdbSet(syncBucket, 'uva:'+iso, JSON.stringify(userValues[iso])).then(()=>true).catch(()=>false)
-    : Promise.resolve(null);
-  return Promise.all([local, cloud]).then(([,cloudOk])=>{
-    if(cloudOk === null) showToast('Guardado ✓');
-    else if(cloudOk) { lastSyncTs = new Date(); updateSyncStatus(); showToast('Guardado y sincronizado ✓'); }
-    else showToast('Guardado en este dispositivo — no se pudo sincronizar');
-  });
+  storage.set('uva:'+iso, JSON.stringify(userValues[iso]), false).catch(()=>{});
+  if(!fbRef){ showToast('Guardado en este dispositivo (sin conexión a la nube)'); return Promise.resolve(); }
+  return fbRef.child('uva/'+iso).set({valor})
+    .then(()=>{ lastSyncTs = new Date(); updateSyncStatus(); showToast('Guardado y sincronizado ✓'); })
+    .catch(err=>{ logDebug(`❌ Error guardando uva/${iso}: ${err.message||err}`); showToast('Guardado en este dispositivo — no se pudo sincronizar'); });
 }
 
 function savePaid(n, value){
   paidState[n] = value;
-  const local = storage.set('paid:'+n, String(value), false).catch(()=>{});
-  const cloud = syncBucket
-    ? kvdbSet(syncBucket, 'paid:'+n, String(value)).then(()=>true).catch(()=>false)
-    : Promise.resolve(null);
-  return Promise.all([local, cloud]).then(([,cloudOk])=>{
-    const base = value ? 'Cuota marcada como pagada' : 'Cuota marcada como pendiente';
-    if(cloudOk === null) showToast(base + ' ✓');
-    else if(cloudOk) { lastSyncTs = new Date(); updateSyncStatus(); showToast(base + ' y sincronizada ✓'); }
-    else showToast(base + ' — no se pudo sincronizar');
-  });
+  storage.set('paid:'+n, String(value), false).catch(()=>{});
+  const base = value ? 'Cuota marcada como pagada' : 'Cuota marcada como pendiente';
+  if(!fbRef){ showToast(base + ' (sin conexión a la nube)'); return Promise.resolve(); }
+  return fbRef.child('paid/'+n).set(value)
+    .then(()=>{ lastSyncTs = new Date(); updateSyncStatus(); showToast(base + ' y sincronizada ✓'); })
+    .catch(err=>{ logDebug(`❌ Error guardando paid/${n}: ${err.message||err}`); showToast(base + ' — no se pudo sincronizar'); });
 }
 
-// ---------- Sincronización compartida (KVdb.io) ----------
-// Código de sincronización precargado: cualquiera que abra este archivo/link queda conectado
-// automáticamente al mismo grupo compartido, sin tener que crear ni pegar ningún código a mano.
-const DEFAULT_SYNC_CODE = 'VY1vQ4hmjm9HaCX8zRuZ2f';
-let syncBucket = localStorage.getItem('credito_uva__syncBucket') || DEFAULT_SYNC_CODE || null;
-if(syncBucket && !localStorage.getItem('credito_uva__syncBucket')){
-  localStorage.setItem('credito_uva__syncBucket', syncBucket);
-}
+// ---------- Sincronización en tiempo real (Firebase Realtime Database) ----------
+// Todas las copias de este archivo apuntan al mismo proyecto de Firebase, así que
+// quedan sincronizadas automáticamente sin necesidad de crear ni compartir ningún código.
+const firebaseConfig = {
+  apiKey: "AIzaSyBtjeLwBsdKL9YeO43YOvqJ--Y2P2MMR5M",
+  authDomain: "credito-uva.firebaseapp.com",
+  databaseURL: "https://credito-uva-default-rtdb.firebaseio.com",
+  projectId: "credito-uva",
+  storageBucket: "credito-uva.firebasestorage.app",
+  messagingSenderId: "949695983606",
+  appId: "1:949695983606:web:44c6a6a3aa902a1fb561d7"
+};
+
+let fbRef = null;
 let lastSyncTs = null;
-let syncing = false;
+let syncPaused = localStorage.getItem('credito_uva__sync_paused') === 'true';
 
 // ---------- Diagnóstico ----------
 let debugLines = [];
@@ -457,51 +459,6 @@ function logDebug(msg){
   debugLines = debugLines.slice(0, 25);
   const el = document.getElementById('debugLog');
   if(el) el.textContent = debugLines.join('\n');
-}
-
-async function kvdbCreateBucket(){
-  const email = 'sync-' + Math.random().toString(36).slice(2,10) + '@credito-uva.local';
-  const body = 'email=' + encodeURIComponent(email) + '&default_ttl=0';
-  logDebug('Creando bucket...');
-  const res = await fetch('https://kvdb.io/', {
-    method:'POST',
-    cache:'no-store',
-    headers:{'Content-Type':'application/x-www-form-urlencoded'},
-    body
-  });
-  logDebug(`Crear bucket → HTTP ${res.status}`);
-  if(!res.ok) throw new Error('create failed: '+res.status);
-  return (await res.text()).trim();
-}
-function kvdbSet(bucket, key, value){
-  return fetch(`https://kvdb.io/${bucket}/${encodeURIComponent(key)}`, {
-    method:'POST', cache:'no-store', body:String(value)
-  }).then(res=>{
-    logDebug(`SET ${key} → HTTP ${res.status}`);
-    if(!res.ok) throw new Error('kvdb set failed: '+res.status);
-    return res;
-  }).catch(err=>{
-    logDebug(`SET ${key} → ERROR: ${err.message || err}`);
-    throw err;
-  });
-}
-async function kvdbGetAll(bucket, prefix){
-  const url = `https://kvdb.io/${bucket}/?prefix=${encodeURIComponent(prefix)}&values=true&format=json&_ts=${Date.now()}`;
-  let res;
-  try{
-    res = await fetch(url, {cache:'no-store', headers:{'Accept':'application/json'}});
-  }catch(err){
-    logDebug(`LIST ${prefix} → ERROR DE RED: ${err.message || err}`);
-    throw err;
-  }
-  logDebug(`LIST ${prefix} → HTTP ${res.status}`);
-  if(!res.ok) throw new Error('kvdb list failed: '+res.status);
-  const data = await res.json();
-  logDebug(`LIST ${prefix} → ${data.length} clave(s) recibidas`);
-  return data;
-}
-function kvdbDelete(bucket, key){
-  return fetch(`https://kvdb.io/${bucket}/${encodeURIComponent(key)}`, {method:'DELETE', cache:'no-store'});
 }
 
 function timeAgo(d){
@@ -515,117 +472,73 @@ function timeAgo(d){
 function updateSyncStatus(){
   const el = document.getElementById('syncStatus');
   if(!el) return;
-  el.innerHTML = syncBucket
-    ? `🟢 Sincronizado ${lastSyncTs ? '· actualizado ' + timeAgo(lastSyncTs) : ''}`
-    : `⚪ Sin sincronizar (solo en este dispositivo)`;
+  if(syncPaused){ el.innerHTML = '⏸️ Sincronización pausada en este dispositivo'; return; }
+  el.innerHTML = fbRef
+    ? `🟢 Sincronizado en vivo ${lastSyncTs ? '· actualizado ' + timeAgo(lastSyncTs) : ''}`
+    : `🟡 Conectando...`;
 }
 
-async function pushAllLocalToCloud(){
-  if(!syncBucket) return;
-  const tasks = [];
-  Object.keys(userValues).forEach(iso => tasks.push(kvdbSet(syncBucket, 'uva:'+iso, JSON.stringify(userValues[iso])).catch(()=>{})));
-  Object.keys(paidState).forEach(n => tasks.push(kvdbSet(syncBucket, 'paid:'+n, String(paidState[n])).catch(()=>{})));
-  await Promise.all(tasks);
-}
-
-async function pullFromCloud(showFeedback){
-  if(!syncBucket || syncing) return;
-  syncing = true;
+function initFirebaseSync(){
+  if(syncPaused){ logDebug('Sincronización pausada por el usuario en este dispositivo.'); updateSyncStatus(); return; }
   try{
-    const [uvaRows, paidRows] = await Promise.all([
-      kvdbGetAll(syncBucket, 'uva:'),
-      kvdbGetAll(syncBucket, 'paid:')
-    ]);
-    let changed = false;
-    uvaRows.forEach(([k,v])=>{
-      const iso = k.slice(4);
-      let parsed; try{ parsed = JSON.parse(v); }catch(e){ parsed = {valor: parseFloat(v)}; }
-      if(!userValues[iso] || userValues[iso].valor !== parsed.valor){ userValues[iso] = parsed; changed = true; }
+    if(!firebase.apps || !firebase.apps.length){
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.database();
+    fbRef = db.ref('sync');
+    logDebug('Firebase inicializado, conectando...');
+
+    db.ref('.info/connected').on('value', snap=>{
+      if(snap.val() === true){ logDebug('✅ Conectado a Firebase'); }
+      else { logDebug('⚪ Sin conexión con Firebase (offline)'); }
+      updateSyncStatus();
     });
-    paidRows.forEach(([k,v])=>{
-      const n = parseInt(k.slice(5));
-      const val = (v === true || v === 'true');
-      if(paidState[n] !== val){ paidState[n] = val; changed = true; }
-    });
-    lastSyncTs = new Date();
-    if(changed){ renderAll(); showToast('🔄 Actualizado desde la nube'); }
-    else { updateSyncStatus(); if(showFeedback) showToast('Ya estás al día ✓'); }
-  }catch(e){
-    console.error('pullFromCloud error', e);
-    if(showFeedback) showToast('No se pudo sincronizar (revisá tu conexión)');
+
+    fbRef.child('uva').on('value', snap=>{
+      const data = snap.val() || {};
+      let changed = false;
+      Object.keys(data).forEach(iso=>{
+        const parsed = data[iso];
+        if(!userValues[iso] || userValues[iso].valor !== parsed.valor){ userValues[iso] = parsed; changed = true; }
+      });
+      lastSyncTs = new Date();
+      logDebug(`uva/ actualizado → ${Object.keys(data).length} clave(s)`);
+      if(changed) renderAll(); else updateSyncStatus();
+    }, err=>{ logDebug(`❌ Error escuchando uva/: ${err.message||err}`); updateSyncStatus(); });
+
+    fbRef.child('paid').on('value', snap=>{
+      const data = snap.val() || {};
+      let changed = false;
+      Object.keys(data).forEach(n=>{
+        const val = !!data[n];
+        if(paidState[n] !== val){ paidState[n] = val; changed = true; }
+      });
+      lastSyncTs = new Date();
+      logDebug(`paid/ actualizado → ${Object.keys(data).length} clave(s)`);
+      if(changed) renderAll(); else updateSyncStatus();
+    }, err=>{ logDebug(`❌ Error escuchando paid/: ${err.message||err}`); updateSyncStatus(); });
+
+  }catch(err){
+    logDebug(`❌ Error inicializando Firebase: ${err.message||err}`);
+    updateSyncStatus();
   }
-  syncing = false;
 }
 
-function renderSyncSetup(){
-  const el = document.getElementById('syncSetup');
-  if(!el) return;
-  if(syncBucket){
-    el.innerHTML = `
-      <div class="uvarow">
-        <div class="field">
-          <label>Código para compartir</label>
-          <input type="text" id="codeDisplay" value="${syncBucket}" readonly style="width:220px">
-        </div>
-        <button class="secondary" id="copyCodeBtn">Copiar código</button>
-        <button class="secondary" id="refreshNowBtn">🔄 Actualizar ahora</button>
-        <button class="secondary" id="unsyncBtn">Dejar de sincronizar</button>
-      </div>`;
-    document.getElementById('copyCodeBtn').addEventListener('click', ()=>{
-      const input = document.getElementById('codeDisplay');
-      if(navigator.clipboard && navigator.clipboard.writeText){
-        navigator.clipboard.writeText(syncBucket).then(()=>showToast('Código copiado ✓')).catch(()=>{});
-      } else {
-        input.select(); document.execCommand('copy'); showToast('Código copiado ✓');
-      }
-    });
-    document.getElementById('refreshNowBtn').addEventListener('click', ()=>pullFromCloud(true));
-    document.getElementById('unsyncBtn').addEventListener('click', ()=>{
-      syncBucket = null;
-      localStorage.removeItem('credito_uva__syncBucket');
-      renderSyncSetup(); updateSyncStatus();
-      showToast('Sincronización desactivada en este dispositivo');
-    });
-  } else {
-    el.innerHTML = `
-      <div class="uvarow">
-        <button id="createSyncBtn">Crear grupo compartido</button>
-        <div class="field">
-          <label>...o pegá un código que te compartieron</label>
-          <input type="text" id="codeInput" placeholder="ej: Fd55uogXyxYdnXJvnyN8Xo">
-        </div>
-        <button class="secondary" id="joinSyncBtn">Conectar</button>
-      </div>`;
-    document.getElementById('createSyncBtn').addEventListener('click', async (e)=>{
-      e.target.textContent = 'Creando...'; e.target.disabled = true;
-      try{
-        const id = await kvdbCreateBucket();
-        syncBucket = id;
-        localStorage.setItem('credito_uva__syncBucket', id);
-        logDebug(`Bucket creado: ${id}`);
-        await pushAllLocalToCloud();
-        lastSyncTs = new Date();
-        renderSyncSetup();
-        showToast('Grupo compartido creado ✓ — copiá el código y compartilo');
-      }catch(err){
-        logDebug(`❌ Error al crear bucket: ${err.message || err}`);
-        showToast('No se pudo crear la sincronización, probá de nuevo');
-        e.target.textContent = 'Crear grupo compartido'; e.target.disabled = false;
-      }
-    });
-    document.getElementById('joinSyncBtn').addEventListener('click', async ()=>{
-      const code = document.getElementById('codeInput').value.trim();
-      if(!code) return;
-      syncBucket = code;
-      localStorage.setItem('credito_uva__syncBucket', code);
-      logDebug(`Conectando al bucket: ${code}`);
-      await pullFromCloud(true);
-      lastSyncTs = new Date();
-      renderSyncSetup();
-      showToast('Conectado al grupo compartido ✓');
-    });
-  }
+function pauseSync(){
+  syncPaused = true;
+  localStorage.setItem('credito_uva__sync_paused', 'true');
+  if(fbRef){ fbRef.child('uva').off(); fbRef.child('paid').off(); fbRef = null; }
+  document.getElementById('toggleSyncBtn').textContent = 'Reanudar sincronización';
   updateSyncStatus();
+  showToast('Sincronización pausada en este dispositivo');
+}
+
+function resumeSync(){
+  syncPaused = false;
+  localStorage.setItem('credito_uva__sync_paused', 'false');
+  document.getElementById('toggleSyncBtn').textContent = 'Pausar sincronización en este dispositivo';
+  initFirebaseSync();
+  showToast('Sincronización reanudada');
 }
 
 function showToast(msg){
@@ -773,20 +686,18 @@ document.addEventListener('change', e=>{
 document.getElementById('applyProj').addEventListener('click', renderAll);
 
 document.getElementById('testConnBtn').addEventListener('click', async ()=>{
-  if(!syncBucket){
-    logDebug('No hay bucket configurado — creá o conectá un grupo compartido primero.');
-    showToast('Primero creá o conectá un grupo compartido');
+  if(!fbRef){
+    logDebug('No hay conexión activa a Firebase.');
+    showToast('Sin conexión activa — revisá si está pausada la sincronización');
     return;
   }
   logDebug('--- Probando conexión ---');
-  logDebug(`Bucket actual: ${syncBucket}`);
   const testVal = 'ping-' + Date.now();
   try{
-    await kvdbSet(syncBucket, '_ping', testVal);
-    const res = await fetch(`https://kvdb.io/${syncBucket}/_ping?_ts=${Date.now()}`, {cache:'no-store'});
-    logDebug(`GET _ping → HTTP ${res.status}`);
-    const readBack = (await res.text()).trim();
+    await fbRef.child('_ping').set(testVal);
     logDebug(`Valor escrito: ${testVal}`);
+    const snap = await fbRef.child('_ping').once('value');
+    const readBack = snap.val();
     logDebug(`Valor leído:   ${readBack}`);
     if(readBack === testVal){
       logDebug('✅ Conexión OK: escritura y lectura funcionan correctamente.');
@@ -801,18 +712,24 @@ document.getElementById('testConnBtn').addEventListener('click', async ()=>{
   }
 });
 
+document.getElementById('refreshNowBtn').addEventListener('click', ()=>{
+  if(!fbRef){ showToast('Sincronización pausada — no hay nada que actualizar'); return; }
+  showToast('Ya está sincronizado en vivo — no hace falta actualizar a mano');
+});
+
+document.getElementById('toggleSyncBtn').addEventListener('click', ()=>{
+  if(syncPaused) resumeSync(); else pauseSync();
+});
+
 document.getElementById('resetUvaBtn').addEventListener('click', async ()=>{
   const keys = await storage.list('uva:', false).catch(()=>null);
   if(keys && keys.keys){
     await Promise.all(keys.keys.map(k=>storage.delete(k, false).catch(()=>{})));
   }
-  if(syncBucket){
-    const rows = await kvdbGetAll(syncBucket, 'uva:').catch(()=>[]);
-    await Promise.all(rows.map(([k])=>kvdbDelete(syncBucket, k).catch(()=>{})));
-  }
+  if(fbRef){ await fbRef.child('uva').remove().catch(()=>{}); }
   userValues = {};
   renderAll();
-  showToast('Valores UVA guardados eliminados' + (syncBucket ? ' (local y nube)' : ''));
+  showToast('Valores UVA guardados eliminados' + (fbRef ? ' (local y nube)' : ''));
 });
 
 document.getElementById('resetPagosBtn').addEventListener('click', async ()=>{
@@ -820,13 +737,10 @@ document.getElementById('resetPagosBtn').addEventListener('click', async ()=>{
   if(keys && keys.keys){
     await Promise.all(keys.keys.map(k=>storage.delete(k, false).catch(()=>{})));
   }
-  if(syncBucket){
-    const rows = await kvdbGetAll(syncBucket, 'paid:').catch(()=>[]);
-    await Promise.all(rows.map(([k])=>kvdbDelete(syncBucket, k).catch(()=>{})));
-  }
+  if(fbRef){ await fbRef.child('paid').remove().catch(()=>{}); }
   paidState = {};
   renderAll();
-  showToast('Estado de pagos restablecido' + (syncBucket ? ' (local y nube)' : ''));
+  showToast('Estado de pagos restablecido' + (fbRef ? ' (local y nube)' : ''));
 });
 
 document.getElementById('filterInput').addEventListener('input', e=>{
@@ -849,16 +763,10 @@ async function init(){
   logDebug(`Origen de la página: ${location.protocol === 'file:' ? 'archivo local (file://)' : location.protocol + '//' + location.host}`);
   logDebug(`Navegador: ${navigator.userAgent.slice(0,90)}`);
   await loadStorage();
-  if(syncBucket){ logDebug(`Bucket guardado en este dispositivo: ${syncBucket}`); await pullFromCloud(true); }
-  renderSyncSetup();
   renderAll();
-  // Sincronización en vivo: revisa cambios de otros dispositivos cada 15 segundos (en silencio,
-  // solo avisa con un toast si efectivamente trajo algo nuevo)
-  setInterval(()=>pullFromCloud(false), 15000);
-  // También al volver a la pestaña/app, por si estuvo en background
-  document.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState === 'visible') pullFromCloud(false);
-  });
+  initFirebaseSync();
+  if(syncPaused){ document.getElementById('toggleSyncBtn').textContent = 'Reanudar sincronización'; }
+  updateSyncStatus();
 }
 // ---------- Pantalla de acceso ----------
 // Hash SHA-256 de la contraseña (no queda en texto plano en el archivo).
