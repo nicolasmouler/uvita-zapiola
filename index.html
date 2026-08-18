@@ -772,8 +772,8 @@ async function init(){
 // Hash SHA-256 de la contraseña (no queda en texto plano en el archivo).
 // Aviso: esto es una barrera básica del lado del navegador, no seguridad real —
 // alguien con conocimientos técnicos podría saltarla viendo el código fuente.
+// Pide la contraseña en cada visita (no se recuerda entre sesiones).
 const LOCK_HASH = 'a9a8e7450164e6a7e1e78ddebb89e8f526a64223d1fb6ad37f60be7958fb8429';
-const LOCK_STORAGE_KEY = 'credito_uva__unlocked_v1';
 
 async function sha256Hex(text){
   if(!window.crypto || !window.crypto.subtle){
@@ -803,7 +803,6 @@ async function tryUnlock(){
     return;
   }
   if(hash === LOCK_HASH){
-    localStorage.setItem(LOCK_STORAGE_KEY, hash);
     errEl.textContent = '';
     showApp();
   } else {
@@ -818,14 +817,7 @@ document.getElementById('lockInput').addEventListener('keydown', e=>{
   if(e.key === 'Enter') tryUnlock();
 });
 
-(async function checkExistingUnlock(){
-  const saved = localStorage.getItem(LOCK_STORAGE_KEY);
-  if(saved && saved === LOCK_HASH){
-    showApp();
-  } else {
-    document.getElementById('lockInput').focus();
-  }
-})();
+document.getElementById('lockInput').focus();
 </script>
 </body>
 </html>
