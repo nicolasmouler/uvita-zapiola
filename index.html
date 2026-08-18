@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f1720">
+<title>Seguimiento Crédito Hipotecario UVA</title>
+<style>
+  :root{
+    --bg:#0f1720; --panel:#141f2b; --panel2:#182634; --border:#233241;
+    --text:#eaf1f8; --muted:#8fa3b5; --accent:#3fb6a8; --accent2:#5b8def;
+    --warn:#e7a33e; --bad:#e0616b; --good:#4cbb87;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    padding:20px 16px 60px;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:1100px;margin:0 auto;}
+  header{margin-bottom:20px;}
+  header h1{font-size:1.35rem;margin:0 0 4px;font-weight:700;letter-spacing:-0.01em;}
+  header p{margin:0;color:var(--muted);font-size:.88rem;}
+  .badge{display:inline-block;background:var(--panel2);border:1px solid var(--border);color:var(--accent);
+    font-size:.72rem;padding:2px 9px;border-radius:99px;margin-left:8px;vertical-align:middle;}
+
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;}
+  @media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr);}}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+  .card .label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+  .card .value{font-size:1.32rem;font-weight:700;word-break:break-word;}
+  .card .sub{font-size:.76rem;color:var(--muted);margin-top:3px;}
+
+  .hero{
+    background:linear-gradient(135deg,#16323a,#12202e);
+    border:1px solid var(--border); border-radius:var(--radius);
+    padding:18px 20px;margin-bottom:18px;display:flex;justify-content:space-between;
+    align-items:center;flex-wrap:wrap;gap:16px;
+  }
+  .hero .left .tag{color:var(--accent);font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
+  .hero .left h2{margin:4px 0 2px;font-size:1.5rem;}
+  .hero .left .date{color:var(--muted);font-size:.85rem;}
+  .hero .right{text-align:right;}
+  .hero .right .amt{font-size:2rem;font-weight:800;color:#fff;}
+  .hero .right .uva{font-size:.78rem;color:var(--muted);}
+  .hero .markbtn{margin-top:8px;}
+  .pill{padding:3px 10px;border-radius:99px;font-size:.72rem;font-weight:700;white-space:nowrap;}
+  .pill.normal{background:rgba(231,163,62,.18);color:var(--warn);}
+  .pill.cancelada{background:rgba(76,187,135,.18);color:var(--good);}
+  .pill.pendiente{background:rgba(91,141,239,.18);color:var(--accent2);}
+
+  section{margin-bottom:22px;}
+  h3{font-size:1rem;margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
+
+  .uvarow{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:.72rem;color:var(--muted);}
+  input[type=number], input[type=text]{
+    background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:7px 9px;font-size:.85rem;width:130px;
+  }
+  input[type=number]:focus, input[type=text]:focus{outline:1px solid var(--accent);}
+  input[type=checkbox]{width:17px;height:17px;accent-color:var(--good);cursor:pointer;}
+  button{
+    background:var(--accent);color:#08201c;border:none;border-radius:8px;
+    padding:8px 14px;font-size:.82rem;font-weight:700;cursor:pointer;
+  }
+  button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border);}
+  button.ghost{background:transparent;color:var(--good);border:1px solid var(--good);padding:5px 10px;font-size:.74rem;}
+  button:active{transform:scale(.97);}
+
+  table{width:100%;border-collapse:collapse;font-size:.83rem;}
+  thead th{
+    text-align:left;color:var(--muted);font-weight:600;font-size:.72rem;text-transform:uppercase;
+    letter-spacing:.03em;padding:8px 8px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--panel);
+  }
+  tbody td{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.04);}
+  tbody tr:hover{background:rgba(255,255,255,.02);}
+  tbody tr.paid td{color:var(--muted);}
+  tbody tr.paid{opacity:.6;}
+  tbody tr.current td{background:rgba(231,163,62,.07);}
+  .tablewrap{max-height:440px;overflow-y:auto;border-radius:10px;}
+  .num{text-align:right;font-variant-numeric:tabular-nums;}
+  .center{text-align:center;}
+  .src{font-size:.68rem;color:var(--muted);}
+  .est{color:var(--accent2);}
+  .conf{color:var(--good);}
+  small.note{color:var(--muted);font-size:.75rem;display:block;margin-top:8px;line-height:1.5;}
+  .chartbox{height:260px;}
+  .capgrid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:10px;}
+  @media(max-width:700px){.capgrid{grid-template-columns:1fr;}}
+  .capcol{text-align:center;}
+  .capcol h4{margin:0 0 12px;font-size:.85rem;color:var(--muted);font-weight:600;}
+  .donut{width:170px;height:170px;border-radius:50%;margin:0 auto;position:relative;
+    transition:background 1s ease;}
+  .donut::before{content:'';position:absolute;inset:20px;background:var(--panel);border-radius:50%;}
+  .donut-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;z-index:1;}
+  .donut-label .pct{font-size:1.5rem;font-weight:800;}
+  .donut-label .txt{font-size:.68rem;color:var(--muted);margin-top:2px;}
+  .caplegend{display:flex;justify-content:center;gap:18px;margin-top:12px;flex-wrap:wrap;}
+  .caplegend .item{font-size:.78rem;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  .caplegend .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;}
+  .caplegend b{color:var(--text);}
+  .flexhead{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--good);color:#06251a;
+    padding:8px 16px;border-radius:8px;font-size:.82rem;font-weight:600;opacity:0;transition:opacity .25s;pointer-events:none;
+    max-width:90vw;text-align:center;z-index:50;}
+  .toast.show{opacity:1;}
+
+  .tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table{min-width:640px;}
+
+  /* --- Celulares --- */
+  @media(max-width:520px){
+    body{padding:14px 10px 50px;}
+    header h1{font-size:1.1rem;}
+    header p{font-size:.78rem;}
+    .grid{grid-template-columns:repeat(2,1fr);gap:8px;}
+    .card{padding:11px 12px;}
+    .card .value{font-size:1.05rem;}
+    .hero{flex-direction:column;align-items:flex-start;padding:14px 16px;}
+    .hero .right{text-align:left;width:100%;}
+    .hero .right .amt{font-size:1.6rem;}
+    .panel{padding:12px;}
+    .uvarow{flex-direction:column;align-items:stretch;}
+    .uvarow .field{width:100%;}
+    .uvarow input[type=number]{width:100%;}
+    .uvarow button{width:100%;}
+    .capgrid{gap:10px;}
+    .donut{width:130px;height:130px;}
+    .donut::before{inset:16px;}
+    .donut-label .pct{font-size:1.2rem;}
+  }
+
+  #lockScreen{
+    position:fixed;inset:0;background:var(--bg);z-index:1000;
+    display:flex;align-items:center;justify-content:center;padding:20px;
+  }
+  #lockScreen.hidden{display:none;}
+  .lockbox{
+    background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    padding:28px 26px;max-width:340px;width:100%;text-align:center;
+  }
+  .lockbox .icon{font-size:2rem;margin-bottom:8px;}
+  .lockbox h2{font-size:1.05rem;margin:0 0 6px;}
+  .lockbox p{color:var(--muted);font-size:.82rem;margin:0 0 16px;}
+  .lockbox input[type=password]{width:100%;margin-bottom:10px;text-align:center;font-size:1rem;padding:10px;}
+  .lockbox button{width:100%;padding:10px;font-size:.88rem;}
+  .lockbox .err{color:var(--bad);font-size:.78rem;margin-top:8px;min-height:16px;}
+  #appRoot{display:none;}
+  #appRoot.visible{display:block;}
+</style>
+</head>
+<body>
+<div id="lockScreen">
+  <div class="lockbox">
+    <div class="icon">🔒</div>
+    <h2>Acceso protegido</h2>
+    <p>Ingresá la contraseña para ver el seguimiento del crédito.</p>
+    <input type="password" id="lockInput" placeholder="Contraseña" autocomplete="off">
+    <button id="lockBtn">Ingresar</button>
+    <div class="err" id="lockErr"></div>
+  </div>
+</div>
+<div id="appRoot">
+<div class="wrap">
+
+<header>
+  <h1>Seguimiento del crédito hipotecario UVA <span class="badge">Subsidiado GCBA · Ciudad Vivienda</span></h1>
+  <p>Operación N.º 1110625866 · Sistema francés · 240 cuotas mensuales · TNA 9,50% · Vigencia desde 23/06/2026</p>
+</header>
+
+<div class="hero" id="heroBox"></div>
+
+<section>
+  <div class="panel">
+    <div class="flexhead">
+      <h3>🔄 Sincronización compartida</h3>
+      <span id="syncStatus" class="src"></span>
+    </div>
+    <div id="syncSetup"></div>
+    <details style="margin-top:10px;">
+      <summary style="cursor:pointer;color:var(--muted);font-size:.78rem;">Diagnóstico técnico</summary>
+      <div class="uvarow" style="margin-top:10px;">
+        <button class="secondary" id="testConnBtn">🧪 Probar conexión</button>
+      </div>
+      <pre id="debugLog" style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+        padding:8px 10px;font-size:.68rem;color:var(--muted);max-height:160px;overflow:auto;white-space:pre-wrap;
+        margin:8px 0 0;">Sin actividad todavía.</pre>
+    </details>
+    <small class="note">
+      Esta copia ya viene conectada automáticamente al grupo compartido — cualquiera que abra este link ve y
+      actualiza los mismos datos (valores UVA cargados y cuotas marcadas como pagadas), sin tener que crear ni
+      pegar ningún código. Se actualiza sola cada 15 segundos, o al tocar "🔄 Actualizar ahora". El código no tiene
+      contraseña: cualquiera con el link puede ver y modificar estos datos, así que no lo compartas fuera de quien
+      corresponda. Si alguna vez necesitás desvincular este dispositivo del grupo, usá "Dejar de sincronizar" más abajo.
+    </small>
+  </div>
+</section>
+
+<div class="grid" id="kpis"></div>
+
+<section>
+  <div class="panel">
+    <div class="flexhead">
+      <h3>💵 Valor UVA por cuota (día de vencimiento)</h3>
+    </div>
+    <div class="uvarow">
+      <div class="field">
+        <label>Inflación mensual proyectada (para cuotas futuras)</label>
+        <input type="number" id="inflInput" step="0.1" value="1.8"> %
+      </div>
+      <button class="secondary" id="applyProj">Recalcular proyección</button>
+      <button class="secondary" id="resetUvaBtn">Restablecer valores UVA guardados</button>
+      <button class="secondary" id="resetPagosBtn">Restablecer cuotas pagadas</button>
+    </div>
+    <small class="note">
+      El monto de cada cuota es el que figura como <strong>"Cuota Total"</strong> en la tabla de amortización
+      (capital + interés neto de subsidio + rubros + IVA), multiplicado por el valor UVA real del día exacto de
+      vencimiento (esa fecha ya viene ajustada por el banco al día hábil más cercano al 10 cuando corresponde).
+      Marcá cada cuota como <strong>pagada</strong> con el check de la tabla a medida que las vayas abonando —
+      queda guardado y el dashboard reordena sola cuál es la próxima a vencer.
+      Los valores UVA que cargues también se guardan en este dispositivo/artefacto.
+      Las cuotas sin valor UVA cargado se muestran <span class="est">estimadas</span> (interpoladas si ya vencieron,
+      proyectadas con la inflación mensual de arriba si son futuras).
+    </small>
+  </div>
+</section>
+
+<section>
+  <div class="panel">
+    <div class="flexhead">
+      <h3>🧮 Capital e interés: pagado vs. restante</h3>
+    </div>
+    <small class="note">Montos en UVA (unidad del crédito); el equivalente en pesos se calcula con el valor UVA de referencia de hoy. Se recalcula según las cuotas que marques como pagadas.</small>
+    <div class="capgrid">
+      <div class="capcol">
+        <h4>Capital</h4>
+        <div class="donut" id="donutCapital"><div class="donut-label" id="labelCapital"></div></div>
+        <div class="caplegend" id="legendCapital"></div>
+      </div>
+      <div class="capcol">
+        <h4>Interés</h4>
+        <div class="donut" id="donutInteres"><div class="donut-label" id="labelInteres"></div></div>
+        <div class="caplegend" id="legendInteres"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="panel">
+    <div class="flexhead">
+      <h3>📋 Plan de cuotas completo (240 meses)</h3>
+      <div class="field">
+        <label>Buscar cuota N.º o mes</label>
+        <input type="text" id="filterInput" placeholder="ej: 5 o 2027-03">
+      </div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="center">Pagada</th><th>#</th><th>Vencimiento</th><th>Estado</th>
+            <th class="num">Cuota Total (UVA)</th><th class="num">Valor UVA</th>
+            <th class="num">Monto a pagar ($)</th><th>Fuente</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+</div>
+</div>
+<div class="toast" id="toast">Guardado</div>
+
+<script>
+const DATA = [{"n":1,"fecha":"2026-07-13","estado":"CANCELADA","saldoCap":49823.13,"capital":69.99,"interes":223.51,"subsidio":-47.06,"cuotaUva":247.04},{"n":2,"fecha":"2026-08-10","estado":"NORMAL","saldoCap":49753.14,"capital":70.54,"interes":393.88,"subsidio":-82.92,"cuotaUva":382.1},{"n":3,"fecha":"2026-09-10","estado":"NO VIGENTE","saldoCap":49682.6,"capital":71.1,"interes":393.32,"subsidio":-82.8,"cuotaUva":382.22},{"n":4,"fecha":"2026-10-13","estado":"NO VIGENTE","saldoCap":49611.5,"capital":71.66,"interes":392.76,"subsidio":-82.69,"cuotaUva":382.33},{"n":5,"fecha":"2026-11-10","estado":"NO VIGENTE","saldoCap":49539.84,"capital":72.23,"interes":392.19,"subsidio":-82.57,"cuotaUva":382.45},{"n":6,"fecha":"2026-12-10","estado":"NO VIGENTE","saldoCap":49467.61,"capital":72.8,"interes":391.62,"subsidio":-82.45,"cuotaUva":382.57},{"n":7,"fecha":"2027-01-11","estado":"NO VIGENTE","saldoCap":49394.81,"capital":73.38,"interes":391.04,"subsidio":-82.32,"cuotaUva":382.7},{"n":8,"fecha":"2027-02-10","estado":"NO VIGENTE","saldoCap":49321.43,"capital":73.96,"interes":390.46,"subsidio":-82.2,"cuotaUva":382.82},{"n":9,"fecha":"2027-03-10","estado":"NO VIGENTE","saldoCap":49247.47,"capital":74.54,"interes":389.88,"subsidio":-82.08,"cuotaUva":382.94},{"n":10,"fecha":"2027-04-12","estado":"NO VIGENTE","saldoCap":49172.93,"capital":75.13,"interes":389.29,"subsidio":-81.95,"cuotaUva":383.07},{"n":11,"fecha":"2027-05-10","estado":"NO VIGENTE","saldoCap":49097.8,"capital":75.73,"interes":388.69,"subsidio":-81.83,"cuotaUva":383.19},{"n":12,"fecha":"2027-06-10","estado":"NO VIGENTE","saldoCap":49022.07,"capital":76.33,"interes":388.09,"subsidio":-81.7,"cuotaUva":383.32},{"n":13,"fecha":"2027-07-12","estado":"NO VIGENTE","saldoCap":48945.74,"capital":76.93,"interes":387.49,"subsidio":-81.58,"cuotaUva":383.44},{"n":14,"fecha":"2027-08-10","estado":"NO VIGENTE","saldoCap":48868.81,"capital":77.54,"interes":386.88,"subsidio":-81.45,"cuotaUva":383.57},{"n":15,"fecha":"2027-09-10","estado":"NO VIGENTE","saldoCap":48791.27,"capital":78.16,"interes":386.26,"subsidio":-81.32,"cuotaUva":383.7},{"n":16,"fecha":"2027-10-11","estado":"NO VIGENTE","saldoCap":48713.11,"capital":78.77,"interes":385.65,"subsidio":-81.19,"cuotaUva":383.83},{"n":17,"fecha":"2027-11-10","estado":"NO VIGENTE","saldoCap":48634.34,"capital":79.4,"interes":385.02,"subsidio":-81.06,"cuotaUva":383.96},{"n":18,"fecha":"2027-12-10","estado":"NO VIGENTE","saldoCap":48554.94,"capital":80.03,"interes":384.39,"subsidio":-80.92,"cuotaUva":384.1},{"n":19,"fecha":"2028-01-10","estado":"NO VIGENTE","saldoCap":48474.91,"capital":80.66,"interes":383.76,"subsidio":-80.79,"cuotaUva":384.23},{"n":20,"fecha":"2028-02-10","estado":"NO VIGENTE","saldoCap":48394.25,"capital":81.3,"interes":383.12,"subsidio":-80.66,"cuotaUva":384.36},{"n":21,"fecha":"2028-03-10","estado":"NO VIGENTE","saldoCap":48312.95,"capital":81.94,"interes":382.48,"subsidio":-80.52,"cuotaUva":384.5},{"n":22,"fecha":"2028-04-10","estado":"NO VIGENTE","saldoCap":48231.01,"capital":82.59,"interes":381.83,"subsidio":-80.39,"cuotaUva":384.63},{"n":23,"fecha":"2028-05-10","estado":"NO VIGENTE","saldoCap":48148.42,"capital":83.25,"interes":381.17,"subsidio":-80.25,"cuotaUva":384.77},{"n":24,"fecha":"2028-06-12","estado":"NO VIGENTE","saldoCap":48065.17,"capital":83.9,"interes":380.52,"subsidio":-80.11,"cuotaUva":384.91},{"n":25,"fecha":"2028-07-10","estado":"NO VIGENTE","saldoCap":47981.27,"capital":84.57,"interes":379.85,"subsidio":-79.97,"cuotaUva":385.05},{"n":26,"fecha":"2028-08-10","estado":"NO VIGENTE","saldoCap":47896.7,"capital":85.24,"interes":379.18,"subsidio":-79.83,"cuotaUva":385.19},{"n":27,"fecha":"2028-09-11","estado":"NO VIGENTE","saldoCap":47811.46,"capital":85.91,"interes":378.51,"subsidio":-79.69,"cuotaUva":385.33},{"n":28,"fecha":"2028-10-10","estado":"NO VIGENTE","saldoCap":47725.55,"capital":86.59,"interes":377.83,"subsidio":-79.54,"cuotaUva":385.48},{"n":29,"fecha":"2028-11-10","estado":"NO VIGENTE","saldoCap":47638.96,"capital":87.28,"interes":377.14,"subsidio":-79.4,"cuotaUva":385.62},{"n":30,"fecha":"2028-12-11","estado":"NO VIGENTE","saldoCap":47551.68,"capital":87.97,"interes":376.45,"subsidio":-79.25,"cuotaUva":385.77},{"n":31,"fecha":"2029-01-10","estado":"NO VIGENTE","saldoCap":47463.71,"capital":88.67,"interes":375.75,"subsidio":-79.11,"cuotaUva":385.91},{"n":32,"fecha":"2029-02-12","estado":"NO VIGENTE","saldoCap":47375.04,"capital":89.37,"interes":375.05,"subsidio":-78.96,"cuotaUva":386.06},{"n":33,"fecha":"2029-03-12","estado":"NO VIGENTE","saldoCap":47285.67,"capital":90.08,"interes":374.34,"subsidio":-78.81,"cuotaUva":386.21},{"n":34,"fecha":"2029-04-10","estado":"NO VIGENTE","saldoCap":47195.59,"capital":90.79,"interes":373.63,"subsidio":-78.66,"cuotaUva":386.36},{"n":35,"fecha":"2029-05-10","estado":"NO VIGENTE","saldoCap":47104.8,"capital":91.51,"interes":372.91,"subsidio":-78.51,"cuotaUva":386.51},{"n":36,"fecha":"2029-06-11","estado":"NO VIGENTE","saldoCap":47013.29,"capital":92.23,"interes":372.19,"subsidio":-78.36,"cuotaUva":386.66},{"n":37,"fecha":"2029-07-10","estado":"NO VIGENTE","saldoCap":46921.06,"capital":92.96,"interes":371.46,"subsidio":-78.2,"cuotaUva":386.82},{"n":38,"fecha":"2029-08-10","estado":"NO VIGENTE","saldoCap":46828.1,"capital":93.7,"interes":370.72,"subsidio":-78.05,"cuotaUva":386.97},{"n":39,"fecha":"2029-09-10","estado":"NO VIGENTE","saldoCap":46734.4,"capital":94.44,"interes":369.98,"subsidio":-77.89,"cuotaUva":387.13},{"n":40,"fecha":"2029-10-10","estado":"NO VIGENTE","saldoCap":46639.96,"capital":95.19,"interes":369.23,"subsidio":-77.73,"cuotaUva":387.29},{"n":41,"fecha":"2029-11-12","estado":"NO VIGENTE","saldoCap":46544.77,"capital":95.94,"interes":368.48,"subsidio":-77.57,"cuotaUva":387.45},{"n":42,"fecha":"2029-12-10","estado":"NO VIGENTE","saldoCap":46448.83,"capital":96.7,"interes":367.72,"subsidio":-77.41,"cuotaUva":387.61},{"n":43,"fecha":"2030-01-10","estado":"NO VIGENTE","saldoCap":46352.13,"capital":97.47,"interes":366.95,"subsidio":-77.25,"cuotaUva":387.77},{"n":44,"fecha":"2030-02-11","estado":"NO VIGENTE","saldoCap":46254.66,"capital":98.24,"interes":366.18,"subsidio":-77.09,"cuotaUva":387.93},{"n":45,"fecha":"2030-03-11","estado":"NO VIGENTE","saldoCap":46156.42,"capital":99.02,"interes":365.4,"subsidio":-76.93,"cuotaUva":388.09},{"n":46,"fecha":"2030-04-10","estado":"NO VIGENTE","saldoCap":46057.4,"capital":99.8,"interes":364.62,"subsidio":-76.76,"cuotaUva":388.26},{"n":47,"fecha":"2030-05-10","estado":"NO VIGENTE","saldoCap":45957.6,"capital":100.59,"interes":363.83,"subsidio":-76.6,"cuotaUva":388.42},{"n":48,"fecha":"2030-06-10","estado":"NO VIGENTE","saldoCap":45857.01,"capital":101.39,"interes":363.03,"subsidio":-76.43,"cuotaUva":388.59},{"n":49,"fecha":"2030-07-10","estado":"NO VIGENTE","saldoCap":45755.62,"capital":102.19,"interes":362.23,"subsidio":-76.26,"cuotaUva":388.76},{"n":50,"fecha":"2030-08-12","estado":"NO VIGENTE","saldoCap":45653.43,"capital":103.0,"interes":361.42,"subsidio":-76.09,"cuotaUva":388.93},{"n":51,"fecha":"2030-09-10","estado":"NO VIGENTE","saldoCap":45550.43,"capital":103.81,"interes":360.61,"subsidio":-75.92,"cuotaUva":389.1},{"n":52,"fecha":"2030-10-10","estado":"NO VIGENTE","saldoCap":45446.62,"capital":104.63,"interes":359.79,"subsidio":-75.74,"cuotaUva":389.28},{"n":53,"fecha":"2030-11-11","estado":"NO VIGENTE","saldoCap":45341.99,"capital":105.46,"interes":358.96,"subsidio":-75.57,"cuotaUva":389.45},{"n":54,"fecha":"2030-12-10","estado":"NO VIGENTE","saldoCap":45236.53,"capital":106.3,"interes":358.12,"subsidio":-75.39,"cuotaUva":389.63},{"n":55,"fecha":"2031-01-10","estado":"NO VIGENTE","saldoCap":45130.23,"capital":107.14,"interes":357.28,"subsidio":-75.22,"cuotaUva":389.8},{"n":56,"fecha":"2031-02-10","estado":"NO VIGENTE","saldoCap":45023.09,"capital":107.99,"interes":356.43,"subsidio":-75.04,"cuotaUva":389.98},{"n":57,"fecha":"2031-03-10","estado":"NO VIGENTE","saldoCap":44915.1,"capital":108.84,"interes":355.58,"subsidio":-74.86,"cuotaUva":390.16},{"n":58,"fecha":"2031-04-10","estado":"NO VIGENTE","saldoCap":44806.26,"capital":109.7,"interes":354.72,"subsidio":-74.68,"cuotaUva":390.34},{"n":59,"fecha":"2031-05-12","estado":"NO VIGENTE","saldoCap":44696.56,"capital":110.57,"interes":353.85,"subsidio":-74.49,"cuotaUva":390.53},{"n":60,"fecha":"2031-06-10","estado":"NO VIGENTE","saldoCap":44585.99,"capital":111.45,"interes":352.97,"subsidio":-74.31,"cuotaUva":390.71},{"n":61,"fecha":"2031-07-10","estado":"NO VIGENTE","saldoCap":44474.54,"capital":112.33,"interes":352.09,"subsidio":-74.12,"cuotaUva":390.9},{"n":62,"fecha":"2031-08-11","estado":"NO VIGENTE","saldoCap":44362.21,"capital":113.22,"interes":351.2,"subsidio":-73.94,"cuotaUva":391.08},{"n":63,"fecha":"2031-09-10","estado":"NO VIGENTE","saldoCap":44248.99,"capital":114.12,"interes":350.3,"subsidio":-73.75,"cuotaUva":391.27},{"n":64,"fecha":"2031-10-10","estado":"NO VIGENTE","saldoCap":44134.87,"capital":115.02,"interes":349.4,"subsidio":-73.56,"cuotaUva":391.46},{"n":65,"fecha":"2031-11-10","estado":"NO VIGENTE","saldoCap":44019.85,"capital":115.93,"interes":348.49,"subsidio":-73.37,"cuotaUva":391.65},{"n":66,"fecha":"2031-12-10","estado":"NO VIGENTE","saldoCap":43903.92,"capital":116.85,"interes":347.57,"subsidio":-73.17,"cuotaUva":391.85},{"n":67,"fecha":"2032-01-12","estado":"NO VIGENTE","saldoCap":43787.07,"capital":117.77,"interes":346.65,"subsidio":-72.98,"cuotaUva":392.04},{"n":68,"fecha":"2032-02-10","estado":"NO VIGENTE","saldoCap":43669.3,"capital":118.7,"interes":345.72,"subsidio":-72.78,"cuotaUva":392.24},{"n":69,"fecha":"2032-03-10","estado":"NO VIGENTE","saldoCap":43550.6,"capital":119.64,"interes":344.78,"subsidio":-72.58,"cuotaUva":392.44},{"n":70,"fecha":"2032-04-12","estado":"NO VIGENTE","saldoCap":43430.96,"capital":120.59,"interes":343.83,"subsidio":-72.38,"cuotaUva":392.64},{"n":71,"fecha":"2032-05-10","estado":"NO VIGENTE","saldoCap":43310.37,"capital":121.55,"interes":342.87,"subsidio":-72.18,"cuotaUva":392.84},{"n":72,"fecha":"2032-06-10","estado":"NO VIGENTE","saldoCap":43188.82,"capital":122.51,"interes":341.91,"subsidio":-71.98,"cuotaUva":393.04},{"n":73,"fecha":"2032-07-12","estado":"NO VIGENTE","saldoCap":43066.31,"capital":123.48,"interes":340.94,"subsidio":-71.78,"cuotaUva":393.24},{"n":74,"fecha":"2032-08-10","estado":"NO VIGENTE","saldoCap":42942.83,"capital":124.46,"interes":339.96,"subsidio":-71.57,"cuotaUva":393.45},{"n":75,"fecha":"2032-09-10","estado":"NO VIGENTE","saldoCap":42818.37,"capital":125.44,"interes":338.98,"subsidio":-71.36,"cuotaUva":393.66},{"n":76,"fecha":"2032-10-11","estado":"NO VIGENTE","saldoCap":42692.93,"capital":126.43,"interes":337.99,"subsidio":-71.15,"cuotaUva":393.87},{"n":77,"fecha":"2032-11-10","estado":"NO VIGENTE","saldoCap":42566.5,"capital":127.44,"interes":336.98,"subsidio":-70.94,"cuotaUva":394.08},{"n":78,"fecha":"2032-12-10","estado":"NO VIGENTE","saldoCap":42439.06,"capital":128.44,"interes":335.98,"subsidio":-70.73,"cuotaUva":394.29},{"n":79,"fecha":"2033-01-10","estado":"NO VIGENTE","saldoCap":42310.62,"capital":129.46,"interes":334.96,"subsidio":-70.52,"cuotaUva":394.5},{"n":80,"fecha":"2033-02-10","estado":"NO VIGENTE","saldoCap":42181.16,"capital":130.49,"interes":333.93,"subsidio":-70.3,"cuotaUva":394.72},{"n":81,"fecha":"2033-03-10","estado":"NO VIGENTE","saldoCap":42050.67,"capital":131.52,"interes":332.9,"subsidio":-70.08,"cuotaUva":394.94},{"n":82,"fecha":"2033-04-11","estado":"NO VIGENTE","saldoCap":41919.15,"capital":132.56,"interes":331.86,"subsidio":-69.87,"cuotaUva":395.15},{"n":83,"fecha":"2033-05-10","estado":"NO VIGENTE","saldoCap":41786.59,"capital":133.61,"interes":330.81,"subsidio":-69.64,"cuotaUva":395.38},{"n":84,"fecha":"2033-06-10","estado":"NO VIGENTE","saldoCap":41652.98,"capital":134.67,"interes":329.75,"subsidio":-69.42,"cuotaUva":395.6},{"n":85,"fecha":"2033-07-11","estado":"NO VIGENTE","saldoCap":41518.31,"capital":135.73,"interes":328.69,"subsidio":-69.2,"cuotaUva":395.82},{"n":86,"fecha":"2033-08-10","estado":"NO VIGENTE","saldoCap":41382.58,"capital":136.81,"interes":327.61,"subsidio":-68.97,"cuotaUva":396.05},{"n":87,"fecha":"2033-09-12","estado":"NO VIGENTE","saldoCap":41245.77,"capital":137.89,"interes":326.53,"subsidio":-68.74,"cuotaUva":396.28},{"n":88,"fecha":"2033-10-10","estado":"NO VIGENTE","saldoCap":41107.88,"capital":138.98,"interes":325.44,"subsidio":-68.51,"cuotaUva":396.51},{"n":89,"fecha":"2033-11-10","estado":"NO VIGENTE","saldoCap":40968.9,"capital":140.08,"interes":324.34,"subsidio":-68.28,"cuotaUva":396.74},{"n":90,"fecha":"2033-12-12","estado":"NO VIGENTE","saldoCap":40828.82,"capital":141.19,"interes":323.23,"subsidio":-68.05,"cuotaUva":396.97},{"n":91,"fecha":"2034-01-10","estado":"NO VIGENTE","saldoCap":40687.63,"capital":142.31,"interes":322.11,"subsidio":-67.81,"cuotaUva":397.21},{"n":92,"fecha":"2034-02-10","estado":"NO VIGENTE","saldoCap":40545.32,"capital":143.44,"interes":320.98,"subsidio":-67.58,"cuotaUva":397.44},{"n":93,"fecha":"2034-03-10","estado":"NO VIGENTE","saldoCap":40401.88,"capital":144.57,"interes":319.85,"subsidio":-67.34,"cuotaUva":397.68},{"n":94,"fecha":"2034-04-10","estado":"NO VIGENTE","saldoCap":40257.31,"capital":145.72,"interes":318.7,"subsidio":-67.1,"cuotaUva":397.92},{"n":95,"fecha":"2034-05-10","estado":"NO VIGENTE","saldoCap":40111.59,"capital":146.87,"interes":317.55,"subsidio":-66.85,"cuotaUva":398.17},{"n":96,"fecha":"2034-06-12","estado":"NO VIGENTE","saldoCap":39964.72,"capital":148.03,"interes":316.39,"subsidio":-66.61,"cuotaUva":398.41},{"n":97,"fecha":"2034-07-10","estado":"NO VIGENTE","saldoCap":39816.69,"capital":149.2,"interes":315.22,"subsidio":-66.36,"cuotaUva":398.66},{"n":98,"fecha":"2034-08-10","estado":"NO VIGENTE","saldoCap":39667.49,"capital":150.39,"interes":314.03,"subsidio":-66.11,"cuotaUva":398.91},{"n":99,"fecha":"2034-09-11","estado":"NO VIGENTE","saldoCap":39517.1,"capital":151.58,"interes":312.84,"subsidio":-65.86,"cuotaUva":399.16},{"n":100,"fecha":"2034-10-10","estado":"NO VIGENTE","saldoCap":39365.52,"capital":152.78,"interes":311.64,"subsidio":-65.61,"cuotaUva":399.41},{"n":101,"fecha":"2034-11-10","estado":"NO VIGENTE","saldoCap":39212.74,"capital":153.99,"interes":310.43,"subsidio":-65.35,"cuotaUva":399.67},{"n":102,"fecha":"2034-12-11","estado":"NO VIGENTE","saldoCap":39058.75,"capital":155.2,"interes":309.22,"subsidio":-65.1,"cuotaUva":399.92},{"n":103,"fecha":"2035-01-10","estado":"NO VIGENTE","saldoCap":38903.55,"capital":156.43,"interes":307.99,"subsidio":-64.84,"cuotaUva":400.18},{"n":104,"fecha":"2035-02-12","estado":"NO VIGENTE","saldoCap":38747.12,"capital":157.67,"interes":306.75,"subsidio":-64.58,"cuotaUva":400.44},{"n":105,"fecha":"2035-03-12","estado":"NO VIGENTE","saldoCap":38589.45,"capital":158.92,"interes":305.5,"subsidio":-64.32,"cuotaUva":400.7},{"n":106,"fecha":"2035-04-10","estado":"NO VIGENTE","saldoCap":38430.53,"capital":160.18,"interes":304.24,"subsidio":-64.05,"cuotaUva":400.97},{"n":107,"fecha":"2035-05-10","estado":"NO VIGENTE","saldoCap":38270.35,"capital":161.45,"interes":302.97,"subsidio":-63.78,"cuotaUva":401.24},{"n":108,"fecha":"2035-06-11","estado":"NO VIGENTE","saldoCap":38108.9,"capital":162.72,"interes":301.7,"subsidio":-63.51,"cuotaUva":401.51},{"n":109,"fecha":"2035-07-10","estado":"NO VIGENTE","saldoCap":37946.18,"capital":164.01,"interes":300.41,"subsidio":-63.24,"cuotaUva":401.78},{"n":110,"fecha":"2035-08-10","estado":"NO VIGENTE","saldoCap":37782.17,"capital":165.31,"interes":299.11,"subsidio":-62.97,"cuotaUva":402.05},{"n":111,"fecha":"2035-09-10","estado":"NO VIGENTE","saldoCap":37616.86,"capital":166.62,"interes":297.8,"subsidio":-62.69,"cuotaUva":402.33},{"n":112,"fecha":"2035-10-10","estado":"NO VIGENTE","saldoCap":37450.24,"capital":167.94,"interes":296.48,"subsidio":-62.42,"cuotaUva":402.6},{"n":113,"fecha":"2035-11-12","estado":"NO VIGENTE","saldoCap":37282.3,"capital":169.27,"interes":295.15,"subsidio":-62.14,"cuotaUva":402.88},{"n":114,"fecha":"2035-12-10","estado":"NO VIGENTE","saldoCap":37113.03,"capital":170.61,"interes":293.81,"subsidio":-61.86,"cuotaUva":403.16},{"n":115,"fecha":"2036-01-10","estado":"NO VIGENTE","saldoCap":36942.42,"capital":171.96,"interes":292.46,"subsidio":-61.57,"cuotaUva":403.45},{"n":116,"fecha":"2036-02-11","estado":"NO VIGENTE","saldoCap":36770.46,"capital":173.32,"interes":291.1,"subsidio":-61.28,"cuotaUva":403.74},{"n":117,"fecha":"2036-03-10","estado":"NO VIGENTE","saldoCap":36597.14,"capital":174.69,"interes":289.73,"subsidio":-61.0,"cuotaUva":404.02},{"n":118,"fecha":"2036-04-10","estado":"NO VIGENTE","saldoCap":36422.45,"capital":176.08,"interes":288.34,"subsidio":-60.7,"cuotaUva":404.32},{"n":119,"fecha":"2036-05-12","estado":"NO VIGENTE","saldoCap":36246.37,"capital":177.47,"interes":286.95,"subsidio":-60.41,"cuotaUva":404.61},{"n":120,"fecha":"2036-06-10","estado":"NO VIGENTE","saldoCap":36068.9,"capital":178.87,"interes":285.55,"subsidio":-60.11,"cuotaUva":404.91},{"n":121,"fecha":"2036-07-10","estado":"NO VIGENTE","saldoCap":35890.03,"capital":180.29,"interes":284.13,"subsidio":-59.82,"cuotaUva":405.2},{"n":122,"fecha":"2036-08-11","estado":"NO VIGENTE","saldoCap":35709.74,"capital":181.72,"interes":282.7,"subsidio":-59.52,"cuotaUva":405.5},{"n":123,"fecha":"2036-09-10","estado":"NO VIGENTE","saldoCap":35528.02,"capital":183.16,"interes":281.26,"subsidio":-59.21,"cuotaUva":405.81},{"n":124,"fecha":"2036-10-10","estado":"NO VIGENTE","saldoCap":35344.86,"capital":184.61,"interes":279.81,"subsidio":-58.91,"cuotaUva":406.11},{"n":125,"fecha":"2036-11-10","estado":"NO VIGENTE","saldoCap":35160.25,"capital":186.07,"interes":278.35,"subsidio":-58.6,"cuotaUva":406.42},{"n":126,"fecha":"2036-12-10","estado":"NO VIGENTE","saldoCap":34974.18,"capital":187.54,"interes":276.88,"subsidio":-58.29,"cuotaUva":406.73},{"n":127,"fecha":"2037-01-12","estado":"NO VIGENTE","saldoCap":34786.64,"capital":189.03,"interes":275.39,"subsidio":-57.98,"cuotaUva":407.04},{"n":128,"fecha":"2037-02-10","estado":"NO VIGENTE","saldoCap":34597.61,"capital":190.52,"interes":273.9,"subsidio":-57.66,"cuotaUva":407.36},{"n":129,"fecha":"2037-03-10","estado":"NO VIGENTE","saldoCap":34407.09,"capital":192.03,"interes":272.39,"subsidio":-57.35,"cuotaUva":407.67},{"n":130,"fecha":"2037-04-10","estado":"NO VIGENTE","saldoCap":34215.06,"capital":193.55,"interes":270.87,"subsidio":-57.03,"cuotaUva":407.99},{"n":131,"fecha":"2037-05-11","estado":"NO VIGENTE","saldoCap":34021.51,"capital":195.08,"interes":269.34,"subsidio":-56.7,"cuotaUva":408.32},{"n":132,"fecha":"2037-06-10","estado":"NO VIGENTE","saldoCap":33826.43,"capital":196.63,"interes":267.79,"subsidio":-56.38,"cuotaUva":408.64},{"n":133,"fecha":"2037-07-10","estado":"NO VIGENTE","saldoCap":33629.8,"capital":198.18,"interes":266.24,"subsidio":-56.05,"cuotaUva":408.97},{"n":134,"fecha":"2037-08-10","estado":"NO VIGENTE","saldoCap":33431.62,"capital":199.75,"interes":264.67,"subsidio":-55.72,"cuotaUva":409.3},{"n":135,"fecha":"2037-09-10","estado":"NO VIGENTE","saldoCap":33231.87,"capital":201.33,"interes":263.09,"subsidio":-55.39,"cuotaUva":409.63},{"n":136,"fecha":"2037-10-12","estado":"NO VIGENTE","saldoCap":33030.54,"capital":202.93,"interes":261.49,"subsidio":-55.05,"cuotaUva":409.97},{"n":137,"fecha":"2037-11-10","estado":"NO VIGENTE","saldoCap":32827.61,"capital":204.53,"interes":259.89,"subsidio":-54.71,"cuotaUva":410.31},{"n":138,"fecha":"2037-12-10","estado":"NO VIGENTE","saldoCap":32623.08,"capital":206.15,"interes":258.27,"subsidio":-54.37,"cuotaUva":410.65},{"n":139,"fecha":"2038-01-11","estado":"NO VIGENTE","saldoCap":32416.93,"capital":207.79,"interes":256.63,"subsidio":-54.03,"cuotaUva":410.99},{"n":140,"fecha":"2038-02-10","estado":"NO VIGENTE","saldoCap":32209.14,"capital":209.43,"interes":254.99,"subsidio":-53.68,"cuotaUva":411.34},{"n":141,"fecha":"2038-03-10","estado":"NO VIGENTE","saldoCap":31999.71,"capital":211.09,"interes":253.33,"subsidio":-53.33,"cuotaUva":411.69},{"n":142,"fecha":"2038-04-12","estado":"NO VIGENTE","saldoCap":31788.62,"capital":212.76,"interes":251.66,"subsidio":-52.98,"cuotaUva":412.04},{"n":143,"fecha":"2038-05-10","estado":"NO VIGENTE","saldoCap":31575.86,"capital":214.44,"interes":249.98,"subsidio":-52.63,"cuotaUva":412.39},{"n":144,"fecha":"2038-06-10","estado":"NO VIGENTE","saldoCap":31361.42,"capital":216.14,"interes":248.28,"subsidio":-52.27,"cuotaUva":412.75},{"n":145,"fecha":"2038-07-12","estado":"NO VIGENTE","saldoCap":31145.28,"capital":217.85,"interes":246.57,"subsidio":-51.91,"cuotaUva":413.11},{"n":146,"fecha":"2038-08-10","estado":"NO VIGENTE","saldoCap":30927.43,"capital":219.58,"interes":244.84,"subsidio":-51.55,"cuotaUva":413.47},{"n":147,"fecha":"2038-09-10","estado":"NO VIGENTE","saldoCap":30707.85,"capital":221.32,"interes":243.1,"subsidio":-51.18,"cuotaUva":413.84},{"n":148,"fecha":"2038-10-11","estado":"NO VIGENTE","saldoCap":30486.53,"capital":223.07,"interes":241.35,"subsidio":-50.81,"cuotaUva":414.21},{"n":149,"fecha":"2038-11-10","estado":"NO VIGENTE","saldoCap":30263.46,"capital":224.83,"interes":239.59,"subsidio":-50.44,"cuotaUva":414.58},{"n":150,"fecha":"2038-12-10","estado":"NO VIGENTE","saldoCap":30038.63,"capital":226.61,"interes":237.81,"subsidio":-50.06,"cuotaUva":414.96},{"n":151,"fecha":"2039-01-10","estado":"NO VIGENTE","saldoCap":29812.02,"capital":228.41,"interes":236.01,"subsidio":-49.69,"cuotaUva":415.33},{"n":152,"fecha":"2039-02-10","estado":"NO VIGENTE","saldoCap":29583.61,"capital":230.22,"interes":234.2,"subsidio":-49.31,"cuotaUva":415.71},{"n":153,"fecha":"2039-03-10","estado":"NO VIGENTE","saldoCap":29353.39,"capital":232.04,"interes":232.38,"subsidio":-48.92,"cuotaUva":416.1},{"n":154,"fecha":"2039-04-11","estado":"NO VIGENTE","saldoCap":29121.35,"capital":233.88,"interes":230.54,"subsidio":-48.54,"cuotaUva":416.48},{"n":155,"fecha":"2039-05-10","estado":"NO VIGENTE","saldoCap":28887.47,"capital":235.73,"interes":228.69,"subsidio":-48.15,"cuotaUva":416.87},{"n":156,"fecha":"2039-06-10","estado":"NO VIGENTE","saldoCap":28651.74,"capital":237.59,"interes":226.83,"subsidio":-47.75,"cuotaUva":417.27},{"n":157,"fecha":"2039-07-11","estado":"NO VIGENTE","saldoCap":28414.15,"capital":239.47,"interes":224.95,"subsidio":-47.36,"cuotaUva":417.66},{"n":158,"fecha":"2039-08-10","estado":"NO VIGENTE","saldoCap":28174.68,"capital":241.37,"interes":223.05,"subsidio":-46.96,"cuotaUva":418.06},{"n":159,"fecha":"2039-09-12","estado":"NO VIGENTE","saldoCap":27933.31,"capital":243.28,"interes":221.14,"subsidio":-46.56,"cuotaUva":418.46},{"n":160,"fecha":"2039-10-10","estado":"NO VIGENTE","saldoCap":27690.03,"capital":245.21,"interes":219.21,"subsidio":-46.15,"cuotaUva":418.87},{"n":161,"fecha":"2039-11-10","estado":"NO VIGENTE","saldoCap":27444.82,"capital":247.15,"interes":217.27,"subsidio":-45.74,"cuotaUva":419.28},{"n":162,"fecha":"2039-12-12","estado":"NO VIGENTE","saldoCap":27197.67,"capital":249.11,"interes":215.31,"subsidio":-45.33,"cuotaUva":419.69},{"n":163,"fecha":"2040-01-10","estado":"NO VIGENTE","saldoCap":26948.56,"capital":251.08,"interes":213.34,"subsidio":-44.91,"cuotaUva":420.11},{"n":164,"fecha":"2040-02-10","estado":"NO VIGENTE","saldoCap":26697.48,"capital":253.06,"interes":211.36,"subsidio":-44.5,"cuotaUva":420.52},{"n":165,"fecha":"2040-03-12","estado":"NO VIGENTE","saldoCap":26444.42,"capital":255.07,"interes":209.35,"subsidio":-44.07,"cuotaUva":420.95},{"n":166,"fecha":"2040-04-10","estado":"NO VIGENTE","saldoCap":26189.35,"capital":257.09,"interes":207.33,"subsidio":-43.65,"cuotaUva":421.37},{"n":167,"fecha":"2040-05-10","estado":"NO VIGENTE","saldoCap":25932.26,"capital":259.12,"interes":205.3,"subsidio":-43.22,"cuotaUva":421.8},{"n":168,"fecha":"2040-06-11","estado":"NO VIGENTE","saldoCap":25673.14,"capital":261.17,"interes":203.25,"subsidio":-42.79,"cuotaUva":422.23},{"n":169,"fecha":"2040-07-10","estado":"NO VIGENTE","saldoCap":25411.97,"capital":263.24,"interes":201.18,"subsidio":-42.35,"cuotaUva":422.67},{"n":170,"fecha":"2040-08-10","estado":"NO VIGENTE","saldoCap":25148.73,"capital":265.33,"interes":199.09,"subsidio":-41.91,"cuotaUva":423.11},{"n":171,"fecha":"2040-09-10","estado":"NO VIGENTE","saldoCap":24883.4,"capital":267.43,"interes":196.99,"subsidio":-41.47,"cuotaUva":423.55},{"n":172,"fecha":"2040-10-10","estado":"NO VIGENTE","saldoCap":24615.97,"capital":269.54,"interes":194.88,"subsidio":-41.03,"cuotaUva":423.99},{"n":173,"fecha":"2040-11-12","estado":"NO VIGENTE","saldoCap":24346.43,"capital":271.68,"interes":192.74,"subsidio":-40.58,"cuotaUva":424.44},{"n":174,"fecha":"2040-12-10","estado":"NO VIGENTE","saldoCap":24074.75,"capital":273.83,"interes":190.59,"subsidio":-40.12,"cuotaUva":424.9},{"n":175,"fecha":"2041-01-10","estado":"NO VIGENTE","saldoCap":23800.92,"capital":276.0,"interes":188.42,"subsidio":-39.67,"cuotaUva":425.35},{"n":176,"fecha":"2041-02-11","estado":"NO VIGENTE","saldoCap":23524.92,"capital":278.18,"interes":186.24,"subsidio":-39.21,"cuotaUva":425.81},{"n":177,"fecha":"2041-03-11","estado":"NO VIGENTE","saldoCap":23246.74,"capital":280.38,"interes":184.04,"subsidio":-38.74,"cuotaUva":426.28},{"n":178,"fecha":"2041-04-10","estado":"NO VIGENTE","saldoCap":22966.36,"capital":282.6,"interes":181.82,"subsidio":-38.28,"cuotaUva":426.74},{"n":179,"fecha":"2041-05-10","estado":"NO VIGENTE","saldoCap":22683.76,"capital":284.84,"interes":179.58,"subsidio":-37.81,"cuotaUva":427.21},{"n":180,"fecha":"2041-06-10","estado":"NO VIGENTE","saldoCap":22398.92,"capital":287.1,"interes":177.32,"subsidio":-37.33,"cuotaUva":427.69},{"n":181,"fecha":"2041-07-10","estado":"NO VIGENTE","saldoCap":22111.82,"capital":289.37,"interes":175.05,"subsidio":-36.85,"cuotaUva":428.17},{"n":182,"fecha":"2041-08-12","estado":"NO VIGENTE","saldoCap":21822.45,"capital":291.66,"interes":172.76,"subsidio":-36.37,"cuotaUva":428.65},{"n":183,"fecha":"2041-09-10","estado":"NO VIGENTE","saldoCap":21530.79,"capital":293.97,"interes":170.45,"subsidio":-35.88,"cuotaUva":429.14},{"n":184,"fecha":"2041-10-10","estado":"NO VIGENTE","saldoCap":21236.82,"capital":296.3,"interes":168.12,"subsidio":-35.39,"cuotaUva":429.63},{"n":185,"fecha":"2041-11-11","estado":"NO VIGENTE","saldoCap":20940.52,"capital":298.64,"interes":165.78,"subsidio":-34.9,"cuotaUva":430.12},{"n":186,"fecha":"2041-12-10","estado":"NO VIGENTE","saldoCap":20641.88,"capital":301.01,"interes":163.41,"subsidio":-34.4,"cuotaUva":430.62},{"n":187,"fecha":"2042-01-10","estado":"NO VIGENTE","saldoCap":20340.87,"capital":303.39,"interes":161.03,"subsidio":-33.9,"cuotaUva":431.12},{"n":188,"fecha":"2042-02-10","estado":"NO VIGENTE","saldoCap":20037.48,"capital":305.79,"interes":158.63,"subsidio":-33.4,"cuotaUva":431.62},{"n":189,"fecha":"2042-03-10","estado":"NO VIGENTE","saldoCap":19731.69,"capital":308.21,"interes":156.21,"subsidio":-32.89,"cuotaUva":432.13},{"n":190,"fecha":"2042-04-10","estado":"NO VIGENTE","saldoCap":19423.48,"capital":310.65,"interes":153.77,"subsidio":-32.37,"cuotaUva":432.65},{"n":191,"fecha":"2042-05-12","estado":"NO VIGENTE","saldoCap":19112.83,"capital":313.11,"interes":151.31,"subsidio":-31.85,"cuotaUva":433.17},{"n":192,"fecha":"2042-06-10","estado":"NO VIGENTE","saldoCap":18799.72,"capital":315.59,"interes":148.83,"subsidio":-31.33,"cuotaUva":433.69},{"n":193,"fecha":"2042-07-10","estado":"NO VIGENTE","saldoCap":18484.13,"capital":318.09,"interes":146.33,"subsidio":-30.81,"cuotaUva":434.21},{"n":194,"fecha":"2042-08-11","estado":"NO VIGENTE","saldoCap":18166.04,"capital":320.61,"interes":143.81,"subsidio":-30.28,"cuotaUva":434.74},{"n":195,"fecha":"2042-09-10","estado":"NO VIGENTE","saldoCap":17845.43,"capital":323.14,"interes":141.28,"subsidio":-29.74,"cuotaUva":435.28},{"n":196,"fecha":"2042-10-10","estado":"NO VIGENTE","saldoCap":17522.29,"capital":325.7,"interes":138.72,"subsidio":-29.2,"cuotaUva":435.82},{"n":197,"fecha":"2042-11-10","estado":"NO VIGENTE","saldoCap":17196.59,"capital":328.28,"interes":136.14,"subsidio":-28.66,"cuotaUva":436.36},{"n":198,"fecha":"2042-12-10","estado":"NO VIGENTE","saldoCap":16868.31,"capital":330.88,"interes":133.54,"subsidio":-28.11,"cuotaUva":436.91},{"n":199,"fecha":"2043-01-12","estado":"NO VIGENTE","saldoCap":16537.43,"capital":333.5,"interes":130.92,"subsidio":-27.56,"cuotaUva":437.46},{"n":200,"fecha":"2043-02-10","estado":"NO VIGENTE","saldoCap":16203.93,"capital":336.14,"interes":128.28,"subsidio":-27.01,"cuotaUva":438.01},{"n":201,"fecha":"2043-03-10","estado":"NO VIGENTE","saldoCap":15867.79,"capital":338.8,"interes":125.62,"subsidio":-26.45,"cuotaUva":438.57},{"n":202,"fecha":"2043-04-10","estado":"NO VIGENTE","saldoCap":15528.99,"capital":341.48,"interes":122.94,"subsidio":-25.88,"cuotaUva":439.14},{"n":203,"fecha":"2043-05-11","estado":"NO VIGENTE","saldoCap":15187.51,"capital":344.19,"interes":120.23,"subsidio":-25.31,"cuotaUva":439.71},{"n":204,"fecha":"2043-06-10","estado":"NO VIGENTE","saldoCap":14843.32,"capital":346.91,"interes":117.51,"subsidio":-24.74,"cuotaUva":440.28},{"n":205,"fecha":"2043-07-10","estado":"NO VIGENTE","saldoCap":14496.41,"capital":349.66,"interes":114.76,"subsidio":-24.16,"cuotaUva":440.86},{"n":206,"fecha":"2043-08-10","estado":"NO VIGENTE","saldoCap":14146.75,"capital":352.42,"interes":112.0,"subsidio":-23.58,"cuotaUva":441.44},{"n":207,"fecha":"2043-09-10","estado":"NO VIGENTE","saldoCap":13794.33,"capital":355.21,"interes":109.21,"subsidio":-22.99,"cuotaUva":442.03},{"n":208,"fecha":"2043-10-12","estado":"NO VIGENTE","saldoCap":13439.12,"capital":358.03,"interes":106.39,"subsidio":-22.4,"cuotaUva":442.62},{"n":209,"fecha":"2043-11-10","estado":"NO VIGENTE","saldoCap":13081.09,"capital":360.86,"interes":103.56,"subsidio":-21.8,"cuotaUva":443.22},{"n":210,"fecha":"2043-12-10","estado":"NO VIGENTE","saldoCap":12720.23,"capital":363.72,"interes":100.7,"subsidio":-21.2,"cuotaUva":443.82},{"n":211,"fecha":"2044-01-11","estado":"NO VIGENTE","saldoCap":12356.51,"capital":366.6,"interes":97.82,"subsidio":-20.59,"cuotaUva":444.43},{"n":212,"fecha":"2044-02-10","estado":"NO VIGENTE","saldoCap":11989.91,"capital":369.5,"interes":94.92,"subsidio":-19.98,"cuotaUva":445.04},{"n":213,"fecha":"2044-03-10","estado":"NO VIGENTE","saldoCap":11620.41,"capital":372.43,"interes":91.99,"subsidio":-19.37,"cuotaUva":445.65},{"n":214,"fecha":"2044-04-11","estado":"NO VIGENTE","saldoCap":11247.98,"capital":375.37,"interes":89.05,"subsidio":-18.75,"cuotaUva":446.27},{"n":215,"fecha":"2044-05-10","estado":"NO VIGENTE","saldoCap":10872.61,"capital":378.35,"interes":86.07,"subsidio":-18.12,"cuotaUva":446.9},{"n":216,"fecha":"2044-06-10","estado":"NO VIGENTE","saldoCap":10494.26,"capital":381.34,"interes":83.08,"subsidio":-17.49,"cuotaUva":447.53},{"n":217,"fecha":"2044-07-11","estado":"NO VIGENTE","saldoCap":10112.92,"capital":384.36,"interes":80.06,"subsidio":-16.85,"cuotaUva":448.17},{"n":218,"fecha":"2044-08-10","estado":"NO VIGENTE","saldoCap":9728.56,"capital":387.4,"interes":77.02,"subsidio":-16.21,"cuotaUva":448.81},{"n":219,"fecha":"2044-09-12","estado":"NO VIGENTE","saldoCap":9341.16,"capital":390.47,"interes":73.95,"subsidio":-15.57,"cuotaUva":449.45},{"n":220,"fecha":"2044-10-10","estado":"NO VIGENTE","saldoCap":8950.69,"capital":393.56,"interes":70.86,"subsidio":-14.92,"cuotaUva":450.1},{"n":221,"fecha":"2044-11-10","estado":"NO VIGENTE","saldoCap":8557.13,"capital":396.68,"interes":67.74,"subsidio":-14.26,"cuotaUva":450.76},{"n":222,"fecha":"2044-12-12","estado":"NO VIGENTE","saldoCap":8160.45,"capital":399.82,"interes":64.6,"subsidio":-13.6,"cuotaUva":451.42},{"n":223,"fecha":"2045-01-10","estado":"NO VIGENTE","saldoCap":7760.63,"capital":402.98,"interes":61.44,"subsidio":-12.93,"cuotaUva":452.09},{"n":224,"fecha":"2045-02-10","estado":"NO VIGENTE","saldoCap":7357.65,"capital":406.17,"interes":58.25,"subsidio":-12.26,"cuotaUva":452.76},{"n":225,"fecha":"2045-03-10","estado":"NO VIGENTE","saldoCap":6951.48,"capital":409.39,"interes":55.03,"subsidio":-11.59,"cuotaUva":453.43},{"n":226,"fecha":"2045-04-10","estado":"NO VIGENTE","saldoCap":6542.09,"capital":412.63,"interes":51.79,"subsidio":-10.9,"cuotaUva":454.12},{"n":227,"fecha":"2045-05-10","estado":"NO VIGENTE","saldoCap":6129.46,"capital":415.9,"interes":48.52,"subsidio":-10.22,"cuotaUva":454.8},{"n":228,"fecha":"2045-06-12","estado":"NO VIGENTE","saldoCap":5713.56,"capital":419.19,"interes":45.23,"subsidio":-9.52,"cuotaUva":455.5},{"n":229,"fecha":"2045-07-10","estado":"NO VIGENTE","saldoCap":5294.37,"capital":422.51,"interes":41.91,"subsidio":-8.82,"cuotaUva":456.2},{"n":230,"fecha":"2045-08-10","estado":"NO VIGENTE","saldoCap":4871.86,"capital":425.85,"interes":38.57,"subsidio":-8.12,"cuotaUva":456.9},{"n":231,"fecha":"2045-09-11","estado":"NO VIGENTE","saldoCap":4446.01,"capital":429.22,"interes":35.2,"subsidio":-7.41,"cuotaUva":457.61},{"n":232,"fecha":"2045-10-10","estado":"NO VIGENTE","saldoCap":4016.79,"capital":432.62,"interes":31.8,"subsidio":-6.69,"cuotaUva":458.33},{"n":233,"fecha":"2045-11-10","estado":"NO VIGENTE","saldoCap":3584.17,"capital":436.05,"interes":28.37,"subsidio":-5.97,"cuotaUva":459.05},{"n":234,"fecha":"2045-12-11","estado":"NO VIGENTE","saldoCap":3148.12,"capital":439.5,"interes":24.92,"subsidio":-5.25,"cuotaUva":459.77},{"n":235,"fecha":"2046-01-10","estado":"NO VIGENTE","saldoCap":2708.62,"capital":442.98,"interes":21.44,"subsidio":-4.51,"cuotaUva":460.51},{"n":236,"fecha":"2046-02-12","estado":"NO VIGENTE","saldoCap":2265.64,"capital":446.48,"interes":17.94,"subsidio":-3.78,"cuotaUva":461.24},{"n":237,"fecha":"2046-03-12","estado":"NO VIGENTE","saldoCap":1819.16,"capital":450.02,"interes":14.4,"subsidio":-3.03,"cuotaUva":461.99},{"n":238,"fecha":"2046-04-10","estado":"NO VIGENTE","saldoCap":1369.14,"capital":453.58,"interes":10.84,"subsidio":-2.28,"cuotaUva":462.74},{"n":239,"fecha":"2046-05-10","estado":"NO VIGENTE","saldoCap":915.56,"capital":457.17,"interes":7.25,"subsidio":-1.53,"cuotaUva":463.49},{"n":240,"fecha":"2046-06-11","estado":"NO VIGENTE","saldoCap":458.39,"capital":458.39,"interes":3.63,"subsidio":-0.76,"cuotaUva":461.86}];
+
+// Valores UVA de referencia obtenidos por búsqueda web (BCRA / agregadores), a modo de semilla.
+// El usuario puede sobrescribir cualquiera de estos valores; lo que cargue queda guardado con mayor prioridad.
+const SEED_UVA = {
+  "2026-06-23": 2007.10,
+  "2026-07-14": 2036.51,
+  "2026-08-08": 2068.01,
+  "2026-08-17": 2076.82
+};
+const SEED_DATES = Object.keys(SEED_UVA).sort();
+const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+const money = n => n==null ? '—' : n.toLocaleString('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0});
+const uvaFmt = n => n==null ? '—' : n.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtDate = iso => { const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; };
+const todayIso = () => TODAY.toISOString().slice(0,10);
+
+let userValues = {};  // { iso: {valor} }        -> valores UVA cargados por el usuario
+let paidState  = {};  // { n: true|false }        -> estado de pago editable por el usuario
+
+// Adaptador de almacenamiento: usa el storage de Claude si está disponible (dentro de claude.ai),
+// y si no (por ejemplo cuando el archivo se abre directo desde WhatsApp/el celular) usa localStorage
+// del propio navegador, para que los datos igual se guarden en ese dispositivo.
+const storage = (function(){
+  if(typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function'){
+    return window.storage;
+  }
+  const PREFIX = 'credito_uva__';
+  return {
+    get(key){
+      return Promise.resolve().then(()=>{
+        const v = localStorage.getItem(PREFIX+key);
+        if(v===null) throw new Error('not found');
+        return {key, value:v};
+      });
+    },
+    set(key, value){
+      return Promise.resolve().then(()=>{
+        localStorage.setItem(PREFIX+key, value);
+        return {key, value};
+      });
+    },
+    delete(key){
+      return Promise.resolve().then(()=>{
+        localStorage.removeItem(PREFIX+key);
+        return {key, deleted:true};
+      });
+    },
+    list(prefix){
+      return Promise.resolve().then(()=>{
+        const keys = [];
+        for(let i=0;i<localStorage.length;i++){
+          const k = localStorage.key(i);
+          if(k && k.indexOf(PREFIX) === 0){
+            const short = k.slice(PREFIX.length);
+            if(!prefix || short.indexOf(prefix) === 0) keys.push(short);
+          }
+        }
+        return {keys};
+      });
+    }
+  };
+})();
+
+function nearestSeedValue(iso){
+  let chosen = SEED_DATES[0];
+  for(const s of SEED_DATES){ if(s <= iso) chosen = s; }
+  const base = SEED_UVA[chosen];
+  const days = (new Date(iso) - new Date(chosen)) / 86400000;
+  const infl = parseFloat(document.getElementById('inflInput')?.value || 1.8)/100;
+  const dailyRate = Math.pow(1+infl, 1/30) - 1;
+  return base * Math.pow(1+dailyRate, days);
+}
+
+function lastKnownAnchor(){
+  let bestDate = SEED_DATES[SEED_DATES.length-1];
+  let bestVal = SEED_UVA[bestDate];
+  Object.keys(userValues).forEach(iso=>{
+    if(iso <= todayIso() && iso > bestDate){ bestDate = iso; bestVal = userValues[iso].valor; }
+  });
+  return {date: bestDate, valor: bestVal};
+}
+
+function getUvaFor(iso){
+  if(userValues[iso]) return {valor:userValues[iso].valor, source:'confirmado', estimated:false};
+  if(SEED_UVA[iso]) return {valor:SEED_UVA[iso], source:'referencia web', estimated:false};
+  if(iso <= todayIso()){
+    return {valor: nearestSeedValue(iso), source:'estimado (interpolado)', estimated:true};
+  }
+  const anchor = lastKnownAnchor();
+  const days = (new Date(iso) - new Date(anchor.date)) / 86400000;
+  const infl = parseFloat(document.getElementById('inflInput')?.value || 1.8)/100;
+  const dailyRate = Math.pow(1+infl, 1/30) - 1;
+  const valor = anchor.valor * Math.pow(1+dailyRate, days);
+  return {valor, source:`proyectado (+${infl}%/mes)`, estimated:true};
+}
+
+function isPaid(n){
+  if(Object.prototype.hasOwnProperty.call(paidState, n)) return paidState[n];
+  const rec = DATA.find(d=>d.n===n);
+  return rec ? rec.estado === 'CANCELADA' : false;
+}
+
+function currentInstallment(){
+  return DATA.find(r => !isPaid(r.n)) || DATA[DATA.length-1];
+}
+
+function loadStorage(){
+  return storage.list('uva:', false).then(res=>{
+    const keys = (res && res.keys) || [];
+    return Promise.all(keys.map(k => storage.get(k, false).then(r=>{
+      if(r && r.value){
+        const iso = k.replace('uva:','');
+        try{ userValues[iso] = JSON.parse(r.value); }catch(e){}
+      }
+    }).catch(()=>{})));
+  }).catch(()=>{})
+  .then(()=> storage.list('paid:', false)).then(res=>{
+    const keys = (res && res.keys) || [];
+    return Promise.all(keys.map(k => storage.get(k, false).then(r=>{
+      if(r && r.value !== undefined){
+        const n = parseInt(k.replace('paid:',''));
+        paidState[n] = r.value === 'true';
+      }
+    }).catch(()=>{})));
+  }).catch(()=>{});
+}
+
+function saveUvaValue(iso, valor){
+  userValues[iso] = {valor};
+  const local = storage.set('uva:'+iso, JSON.stringify(userValues[iso]), false).catch(()=>{});
+  const cloud = syncBucket
+    ? kvdbSet(syncBucket, 'uva:'+iso, JSON.stringify(userValues[iso])).then(()=>true).catch(()=>false)
+    : Promise.resolve(null);
+  return Promise.all([local, cloud]).then(([,cloudOk])=>{
+    if(cloudOk === null) showToast('Guardado ✓');
+    else if(cloudOk) { lastSyncTs = new Date(); updateSyncStatus(); showToast('Guardado y sincronizado ✓'); }
+    else showToast('Guardado en este dispositivo — no se pudo sincronizar');
+  });
+}
+
+function savePaid(n, value){
+  paidState[n] = value;
+  const local = storage.set('paid:'+n, String(value), false).catch(()=>{});
+  const cloud = syncBucket
+    ? kvdbSet(syncBucket, 'paid:'+n, String(value)).then(()=>true).catch(()=>false)
+    : Promise.resolve(null);
+  return Promise.all([local, cloud]).then(([,cloudOk])=>{
+    const base = value ? 'Cuota marcada como pagada' : 'Cuota marcada como pendiente';
+    if(cloudOk === null) showToast(base + ' ✓');
+    else if(cloudOk) { lastSyncTs = new Date(); updateSyncStatus(); showToast(base + ' y sincronizada ✓'); }
+    else showToast(base + ' — no se pudo sincronizar');
+  });
+}
+
+// ---------- Sincronización compartida (KVdb.io) ----------
+// Código de sincronización precargado: cualquiera que abra este archivo/link queda conectado
+// automáticamente al mismo grupo compartido, sin tener que crear ni pegar ningún código a mano.
+const DEFAULT_SYNC_CODE = 'VY1vQ4hmjm9HaCX8zRuZ2f';
+let syncBucket = localStorage.getItem('credito_uva__syncBucket') || DEFAULT_SYNC_CODE || null;
+if(syncBucket && !localStorage.getItem('credito_uva__syncBucket')){
+  localStorage.setItem('credito_uva__syncBucket', syncBucket);
+}
+let lastSyncTs = null;
+let syncing = false;
+
+// ---------- Diagnóstico ----------
+let debugLines = [];
+function logDebug(msg){
+  const t = new Date().toLocaleTimeString('es-AR');
+  debugLines.unshift(`[${t}] ${msg}`);
+  debugLines = debugLines.slice(0, 25);
+  const el = document.getElementById('debugLog');
+  if(el) el.textContent = debugLines.join('\n');
+}
+
+async function kvdbCreateBucket(){
+  const email = 'sync-' + Math.random().toString(36).slice(2,10) + '@credito-uva.local';
+  const body = 'email=' + encodeURIComponent(email) + '&default_ttl=0';
+  logDebug('Creando bucket...');
+  const res = await fetch('https://kvdb.io/', {
+    method:'POST',
+    cache:'no-store',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body
+  });
+  logDebug(`Crear bucket → HTTP ${res.status}`);
+  if(!res.ok) throw new Error('create failed: '+res.status);
+  return (await res.text()).trim();
+}
+function kvdbSet(bucket, key, value){
+  return fetch(`https://kvdb.io/${bucket}/${encodeURIComponent(key)}`, {
+    method:'POST', cache:'no-store', body:String(value)
+  }).then(res=>{
+    logDebug(`SET ${key} → HTTP ${res.status}`);
+    if(!res.ok) throw new Error('kvdb set failed: '+res.status);
+    return res;
+  }).catch(err=>{
+    logDebug(`SET ${key} → ERROR: ${err.message || err}`);
+    throw err;
+  });
+}
+async function kvdbGetAll(bucket, prefix){
+  const url = `https://kvdb.io/${bucket}/?prefix=${encodeURIComponent(prefix)}&values=true&format=json&_ts=${Date.now()}`;
+  let res;
+  try{
+    res = await fetch(url, {cache:'no-store', headers:{'Accept':'application/json'}});
+  }catch(err){
+    logDebug(`LIST ${prefix} → ERROR DE RED: ${err.message || err}`);
+    throw err;
+  }
+  logDebug(`LIST ${prefix} → HTTP ${res.status}`);
+  if(!res.ok) throw new Error('kvdb list failed: '+res.status);
+  const data = await res.json();
+  logDebug(`LIST ${prefix} → ${data.length} clave(s) recibidas`);
+  return data;
+}
+function kvdbDelete(bucket, key){
+  return fetch(`https://kvdb.io/${bucket}/${encodeURIComponent(key)}`, {method:'DELETE', cache:'no-store'});
+}
+
+function timeAgo(d){
+  if(!d) return '';
+  const s = Math.round((new Date()-d)/1000);
+  if(s<5) return 'recién';
+  if(s<60) return `hace ${s}s`;
+  return `hace ${Math.round(s/60)}min`;
+}
+
+function updateSyncStatus(){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  el.innerHTML = syncBucket
+    ? `🟢 Sincronizado ${lastSyncTs ? '· actualizado ' + timeAgo(lastSyncTs) : ''}`
+    : `⚪ Sin sincronizar (solo en este dispositivo)`;
+}
+
+async function pushAllLocalToCloud(){
+  if(!syncBucket) return;
+  const tasks = [];
+  Object.keys(userValues).forEach(iso => tasks.push(kvdbSet(syncBucket, 'uva:'+iso, JSON.stringify(userValues[iso])).catch(()=>{})));
+  Object.keys(paidState).forEach(n => tasks.push(kvdbSet(syncBucket, 'paid:'+n, String(paidState[n])).catch(()=>{})));
+  await Promise.all(tasks);
+}
+
+async function pullFromCloud(showFeedback){
+  if(!syncBucket || syncing) return;
+  syncing = true;
+  try{
+    const [uvaRows, paidRows] = await Promise.all([
+      kvdbGetAll(syncBucket, 'uva:'),
+      kvdbGetAll(syncBucket, 'paid:')
+    ]);
+    let changed = false;
+    uvaRows.forEach(([k,v])=>{
+      const iso = k.slice(4);
+      let parsed; try{ parsed = JSON.parse(v); }catch(e){ parsed = {valor: parseFloat(v)}; }
+      if(!userValues[iso] || userValues[iso].valor !== parsed.valor){ userValues[iso] = parsed; changed = true; }
+    });
+    paidRows.forEach(([k,v])=>{
+      const n = parseInt(k.slice(5));
+      const val = (v === true || v === 'true');
+      if(paidState[n] !== val){ paidState[n] = val; changed = true; }
+    });
+    lastSyncTs = new Date();
+    if(changed){ renderAll(); showToast('🔄 Actualizado desde la nube'); }
+    else { updateSyncStatus(); if(showFeedback) showToast('Ya estás al día ✓'); }
+  }catch(e){
+    console.error('pullFromCloud error', e);
+    if(showFeedback) showToast('No se pudo sincronizar (revisá tu conexión)');
+  }
+  syncing = false;
+}
+
+function renderSyncSetup(){
+  const el = document.getElementById('syncSetup');
+  if(!el) return;
+  if(syncBucket){
+    el.innerHTML = `
+      <div class="uvarow">
+        <div class="field">
+          <label>Código para compartir</label>
+          <input type="text" id="codeDisplay" value="${syncBucket}" readonly style="width:220px">
+        </div>
+        <button class="secondary" id="copyCodeBtn">Copiar código</button>
+        <button class="secondary" id="refreshNowBtn">🔄 Actualizar ahora</button>
+        <button class="secondary" id="unsyncBtn">Dejar de sincronizar</button>
+      </div>`;
+    document.getElementById('copyCodeBtn').addEventListener('click', ()=>{
+      const input = document.getElementById('codeDisplay');
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(syncBucket).then(()=>showToast('Código copiado ✓')).catch(()=>{});
+      } else {
+        input.select(); document.execCommand('copy'); showToast('Código copiado ✓');
+      }
+    });
+    document.getElementById('refreshNowBtn').addEventListener('click', ()=>pullFromCloud(true));
+    document.getElementById('unsyncBtn').addEventListener('click', ()=>{
+      syncBucket = null;
+      localStorage.removeItem('credito_uva__syncBucket');
+      renderSyncSetup(); updateSyncStatus();
+      showToast('Sincronización desactivada en este dispositivo');
+    });
+  } else {
+    el.innerHTML = `
+      <div class="uvarow">
+        <button id="createSyncBtn">Crear grupo compartido</button>
+        <div class="field">
+          <label>...o pegá un código que te compartieron</label>
+          <input type="text" id="codeInput" placeholder="ej: Fd55uogXyxYdnXJvnyN8Xo">
+        </div>
+        <button class="secondary" id="joinSyncBtn">Conectar</button>
+      </div>`;
+    document.getElementById('createSyncBtn').addEventListener('click', async (e)=>{
+      e.target.textContent = 'Creando...'; e.target.disabled = true;
+      try{
+        const id = await kvdbCreateBucket();
+        syncBucket = id;
+        localStorage.setItem('credito_uva__syncBucket', id);
+        logDebug(`Bucket creado: ${id}`);
+        await pushAllLocalToCloud();
+        lastSyncTs = new Date();
+        renderSyncSetup();
+        showToast('Grupo compartido creado ✓ — copiá el código y compartilo');
+      }catch(err){
+        logDebug(`❌ Error al crear bucket: ${err.message || err}`);
+        showToast('No se pudo crear la sincronización, probá de nuevo');
+        e.target.textContent = 'Crear grupo compartido'; e.target.disabled = false;
+      }
+    });
+    document.getElementById('joinSyncBtn').addEventListener('click', async ()=>{
+      const code = document.getElementById('codeInput').value.trim();
+      if(!code) return;
+      syncBucket = code;
+      localStorage.setItem('credito_uva__syncBucket', code);
+      logDebug(`Conectando al bucket: ${code}`);
+      await pullFromCloud(true);
+      lastSyncTs = new Date();
+      renderSyncSetup();
+      showToast('Conectado al grupo compartido ✓');
+    });
+  }
+  updateSyncStatus();
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(showToast._h);
+  showToast._h = setTimeout(()=>t.classList.remove('show'), 1400);
+}
+
+function renderHero(){
+  const current = currentInstallment();
+  const {valor, source} = getUvaFor(current.fecha);
+  const pesos = current.cuotaUva * valor;
+  const box = document.getElementById('heroBox');
+  const overdue = new Date(current.fecha) < TODAY;
+  box.innerHTML = `
+    <div class="left">
+      <div class="tag">Cuota N.º ${current.n} ${overdue?'· vencida':'· próxima a vencer'}</div>
+      <h2>${fmtDate(current.fecha)}</h2>
+      <div class="date">${uvaFmt(current.cuotaUva)} UVA × $${uvaFmt(valor)} (${source})</div>
+      <button class="ghost markbtn" id="heroMarkPaid">Marcar como pagada</button>
+    </div>
+    <div class="right">
+      <div class="amt">${money(pesos)}</div>
+      <div class="uva">monto estimado a pagar</div>
+    </div>`;
+  document.getElementById('heroMarkPaid').addEventListener('click', ()=>{
+    savePaid(current.n, true).then(()=>{ renderAll(); });
+  });
+}
+
+function renderKpis(){
+  const pagadas = DATA.filter(r=>isPaid(r.n)).length;
+  const last = DATA[DATA.length-1];
+  const cur = currentInstallment();
+  const saldoUva = cur.saldoCap;
+  const refDate = todayIso() <= last.fecha ? todayIso() : last.fecha;
+  const {valor: uvaHoy} = getUvaFor(refDate);
+  const saldoPesos = saldoUva * uvaHoy;
+  const progreso = ((pagadas/DATA.length)*100).toFixed(1);
+
+  const kpis = [
+    {label:'Cuotas pagadas', value:`${pagadas} / ${DATA.length}`, sub:`${progreso}% del plazo`},
+    {label:'Saldo de capital', value:`${uvaFmt(saldoUva)} UVA`, sub:`≈ ${money(saldoPesos)} hoy`},
+    {label:'Valor UVA de referencia hoy', value:`$${uvaFmt(uvaHoy)}`, sub:`al ${fmtDate(todayIso())}`},
+    {label:'Vencimiento final', value:fmtDate(last.fecha), sub:`cuota N.º ${last.n}`},
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(k=>`
+    <div class="card">
+      <div class="label">${k.label}</div>
+      <div class="value">${k.value}</div>
+      <div class="sub">${k.sub}</div>
+    </div>`).join('');
+}
+
+function totalsFor(field){
+  const total = DATA.reduce((s,r)=>s+r[field],0);
+  const pagado = DATA.filter(r=>isPaid(r.n)).reduce((s,r)=>s+r[field],0);
+  return {total, pagado, restante: total - pagado};
+}
+
+function paintDonut(donutId, labelId, pagado, total, colorPagado){
+  const pct = total > 0 ? (pagado/total*100) : 0;
+  const donut = document.getElementById(donutId);
+  donut.style.background = `conic-gradient(${colorPagado} 0% ${pct}%, rgba(255,255,255,.08) ${pct}% 100%)`;
+  document.getElementById(labelId).innerHTML = `
+    <span class="pct">${pct.toFixed(1)}%</span>
+    <span class="txt">pagado</span>`;
+}
+
+function renderCapitalInteresCharts(){
+  const cap = totalsFor('capital');
+  const int = totalsFor('interes');
+  const refDate = todayIso() <= DATA[DATA.length-1].fecha ? todayIso() : DATA[DATA.length-1].fecha;
+  const {valor: uvaHoy} = getUvaFor(refDate);
+
+  paintDonut('donutCapital', 'labelCapital', cap.pagado, cap.total, '#3fb6a8');
+  paintDonut('donutInteres', 'labelInteres', int.pagado, int.total, '#e7a33e');
+
+  document.getElementById('legendCapital').innerHTML = `
+    <div class="item"><span class="dot" style="background:#3fb6a8"></span>
+      Pagado: <b>${uvaFmt(cap.pagado)} UVA</b> (${money(cap.pagado*uvaHoy)})</div>
+    <div class="item"><span class="dot" style="background:rgba(255,255,255,.25)"></span>
+      Restante: <b>${uvaFmt(cap.restante)} UVA</b> (${money(cap.restante*uvaHoy)})</div>`;
+
+  document.getElementById('legendInteres').innerHTML = `
+    <div class="item"><span class="dot" style="background:#e7a33e"></span>
+      Pagado: <b>${uvaFmt(int.pagado)} UVA</b> (${money(int.pagado*uvaHoy)})</div>
+    <div class="item"><span class="dot" style="background:rgba(255,255,255,.25)"></span>
+      Restante: <b>${uvaFmt(int.restante)} UVA</b> (${money(int.restante*uvaHoy)})</div>`;
+}
+
+function rowHtml(r){
+  const paid = isPaid(r.n);
+  const cur = currentInstallment();
+  const isCurrent = !paid && r.n === cur.n;
+  const {valor, source, estimated} = getUvaFor(r.fecha);
+  const pesos = r.cuotaUva * valor;
+  const pillClass = paid ? 'cancelada' : (isCurrent ? 'normal' : 'pendiente');
+  const pillText = paid ? 'Pagada' : (isCurrent ? 'A vencer' : 'Pendiente');
+  return `
+    <tr class="${paid?'paid':''} ${isCurrent?'current':''}" data-n="${r.n}" data-month="${r.fecha.slice(0,7)}">
+      <td class="center"><input type="checkbox" class="paidCheck" data-n="${r.n}" ${paid?'checked':''}></td>
+      <td>${r.n}</td>
+      <td>${fmtDate(r.fecha)}</td>
+      <td><span class="pill ${pillClass}">${pillText}</span></td>
+      <td class="num">${uvaFmt(r.cuotaUva)}</td>
+      <td class="num">
+        <input type="number" step="0.01" class="uvaInput" data-iso="${r.fecha}" value="${valor.toFixed(2)}" style="width:100px">
+      </td>
+      <td class="num amtcell">${money(pesos)}</td>
+      <td class="src ${estimated?'est':'conf'}">${source}</td>
+    </tr>`;
+}
+
+function renderTable(){
+  document.getElementById('tbody').innerHTML = DATA.map(rowHtml).join('');
+}
+
+function recalcRow(tr){
+  const iso = tr.querySelector('.uvaInput').dataset.iso;
+  const n = parseInt(tr.dataset.n);
+  const rec = DATA.find(d=>d.n===n);
+  const valor = parseFloat(tr.querySelector('.uvaInput').value) || 0;
+  tr.querySelector('.amtcell').textContent = money(rec.cuotaUva * valor);
+}
+
+document.addEventListener('change', e=>{
+  if(e.target.classList.contains('uvaInput')){
+    const iso = e.target.dataset.iso;
+    const valor = parseFloat(e.target.value);
+    if(!isNaN(valor)){
+      saveUvaValue(iso, valor).then(()=>{
+        recalcRow(e.target.closest('tr'));
+        renderAll();
+      });
+    }
+  }
+  if(e.target.classList.contains('paidCheck')){
+    const n = parseInt(e.target.dataset.n);
+    savePaid(n, e.target.checked).then(()=> renderAll());
+  }
+});
+
+document.getElementById('applyProj').addEventListener('click', renderAll);
+
+document.getElementById('testConnBtn').addEventListener('click', async ()=>{
+  if(!syncBucket){
+    logDebug('No hay bucket configurado — creá o conectá un grupo compartido primero.');
+    showToast('Primero creá o conectá un grupo compartido');
+    return;
+  }
+  logDebug('--- Probando conexión ---');
+  logDebug(`Bucket actual: ${syncBucket}`);
+  const testVal = 'ping-' + Date.now();
+  try{
+    await kvdbSet(syncBucket, '_ping', testVal);
+    const res = await fetch(`https://kvdb.io/${syncBucket}/_ping?_ts=${Date.now()}`, {cache:'no-store'});
+    logDebug(`GET _ping → HTTP ${res.status}`);
+    const readBack = (await res.text()).trim();
+    logDebug(`Valor escrito: ${testVal}`);
+    logDebug(`Valor leído:   ${readBack}`);
+    if(readBack === testVal){
+      logDebug('✅ Conexión OK: escritura y lectura funcionan correctamente.');
+      showToast('Conexión OK ✓');
+    } else {
+      logDebug('⚠️ El valor leído no coincide con el escrito.');
+      showToast('Conexión con problemas — revisá el diagnóstico');
+    }
+  }catch(err){
+    logDebug(`❌ Falló la conexión: ${err.message || err}`);
+    showToast('No se pudo conectar — revisá el diagnóstico');
+  }
+});
+
+document.getElementById('resetUvaBtn').addEventListener('click', async ()=>{
+  const keys = await storage.list('uva:', false).catch(()=>null);
+  if(keys && keys.keys){
+    await Promise.all(keys.keys.map(k=>storage.delete(k, false).catch(()=>{})));
+  }
+  if(syncBucket){
+    const rows = await kvdbGetAll(syncBucket, 'uva:').catch(()=>[]);
+    await Promise.all(rows.map(([k])=>kvdbDelete(syncBucket, k).catch(()=>{})));
+  }
+  userValues = {};
+  renderAll();
+  showToast('Valores UVA guardados eliminados' + (syncBucket ? ' (local y nube)' : ''));
+});
+
+document.getElementById('resetPagosBtn').addEventListener('click', async ()=>{
+  const keys = await storage.list('paid:', false).catch(()=>null);
+  if(keys && keys.keys){
+    await Promise.all(keys.keys.map(k=>storage.delete(k, false).catch(()=>{})));
+  }
+  if(syncBucket){
+    const rows = await kvdbGetAll(syncBucket, 'paid:').catch(()=>[]);
+    await Promise.all(rows.map(([k])=>kvdbDelete(syncBucket, k).catch(()=>{})));
+  }
+  paidState = {};
+  renderAll();
+  showToast('Estado de pagos restablecido' + (syncBucket ? ' (local y nube)' : ''));
+});
+
+document.getElementById('filterInput').addEventListener('input', e=>{
+  const q = e.target.value.trim().toLowerCase();
+  document.querySelectorAll('#tbody tr').forEach(tr=>{
+    const n = tr.dataset.n, month = tr.dataset.month;
+    const show = !q || n.includes(q) || month.includes(q);
+    tr.style.display = show ? '' : 'none';
+  });
+});
+
+function renderAll(){
+  renderTable();
+  renderHero();
+  renderKpis();
+  renderCapitalInteresCharts();
+}
+
+async function init(){
+  logDebug(`Origen de la página: ${location.protocol === 'file:' ? 'archivo local (file://)' : location.protocol + '//' + location.host}`);
+  logDebug(`Navegador: ${navigator.userAgent.slice(0,90)}`);
+  await loadStorage();
+  if(syncBucket){ logDebug(`Bucket guardado en este dispositivo: ${syncBucket}`); await pullFromCloud(true); }
+  renderSyncSetup();
+  renderAll();
+  // Sincronización en vivo: revisa cambios de otros dispositivos cada 15 segundos (en silencio,
+  // solo avisa con un toast si efectivamente trajo algo nuevo)
+  setInterval(()=>pullFromCloud(false), 15000);
+  // También al volver a la pestaña/app, por si estuvo en background
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'visible') pullFromCloud(false);
+  });
+}
+// ---------- Pantalla de acceso ----------
+// Hash SHA-256 de la contraseña (no queda en texto plano en el archivo).
+// Aviso: esto es una barrera básica del lado del navegador, no seguridad real —
+// alguien con conocimientos técnicos podría saltarla viendo el código fuente.
+const LOCK_HASH = 'a9a8e7450164e6a7e1e78ddebb89e8f526a64223d1fb6ad37f60be7958fb8429';
+const LOCK_STORAGE_KEY = 'credito_uva__unlocked_v1';
+
+async function sha256Hex(text){
+  if(!window.crypto || !window.crypto.subtle){
+    throw new Error('no-subtle-crypto');
+  }
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function showApp(){
+  document.getElementById('lockScreen').classList.add('hidden');
+  document.getElementById('appRoot').classList.add('visible');
+  init();
+}
+
+async function tryUnlock(){
+  const input = document.getElementById('lockInput');
+  const errEl = document.getElementById('lockErr');
+  const val = input.value;
+  if(!val){ return; }
+  let hash;
+  try{
+    hash = await sha256Hex(val);
+  }catch(e){
+    errEl.textContent = 'Este navegador no permite verificar la contraseña acá — abrí la página con https:// (el link publicado) en vez del archivo local.';
+    return;
+  }
+  if(hash === LOCK_HASH){
+    localStorage.setItem(LOCK_STORAGE_KEY, hash);
+    errEl.textContent = '';
+    showApp();
+  } else {
+    errEl.textContent = 'Contraseña incorrecta';
+    input.value = '';
+    input.focus();
+  }
+}
+
+document.getElementById('lockBtn').addEventListener('click', tryUnlock);
+document.getElementById('lockInput').addEventListener('keydown', e=>{
+  if(e.key === 'Enter') tryUnlock();
+});
+
+(async function checkExistingUnlock(){
+  const saved = localStorage.getItem(LOCK_STORAGE_KEY);
+  if(saved && saved === LOCK_HASH){
+    showApp();
+  } else {
+    document.getElementById('lockInput').focus();
+  }
+})();
+</script>
+</body>
+</html>
