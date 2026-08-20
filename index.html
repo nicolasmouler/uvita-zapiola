@@ -236,7 +236,7 @@
       (capital + interés neto de subsidio + rubros + IVA), multiplicado por el valor UVA real del día exacto de
       vencimiento (esa fecha ya viene ajustada por el banco al día hábil más cercano al 10 cuando corresponde).
       El valor UVA de cada cuota ya vencida se trae automáticamente de la
-      <strong>API pública oficial del BCRA</strong> (serie 7913). Si por algún motivo no se puede consultar, se usa
+      <strong>API pública oficial del BCRA</strong> (variable 31). Si por algún motivo no se puede consultar, se usa
       una estimación de respaldo, marcada como tal. Podés sobrescribir cualquier valor a mano si hace falta — ese
       valor manual siempre tiene prioridad.
       Marcá cada cuota como <strong>pagada</strong> con el check de la tabla a medida que las vayas abonando —
@@ -453,7 +453,7 @@ function getUvaFor(iso){
   return {valor, source:`proyectado (+${infl}%/mes)`, estimated:true};
 }
 
-// ---------- Valores UVA oficiales del BCRA (API pública, serie 7913) ----------
+// ---------- Valores UVA oficiales del BCRA (API pública, variable 31) ----------
 function bcraStatusText(){
   const n = Object.keys(bcraCache).length;
   if(bcraStatus === 'loading') return '🟡 Consultando valores oficiales del BCRA...';
@@ -470,12 +470,12 @@ function updateBcraStatusUI(){
 async function fetchBcraUva(){
   bcraStatus = 'loading';
   updateBcraStatusUI();
-  logDebug('Consultando valores UVA oficiales del BCRA (serie 7913)...');
+  logDebug('Consultando valores UVA oficiales del BCRA (variable 31)...');
   try{
     // La API pide formato date-time completo (no solo YYYY-MM-DD).
     const desde = VIGENCIA_INICIO_ISO + 'T00:00:00';
     const hasta = todayIso() + 'T00:00:00';
-    const url = `https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias/7913?Desde=${encodeURIComponent(desde)}&Hasta=${encodeURIComponent(hasta)}`;
+    const url = `https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias/31?Desde=${encodeURIComponent(desde)}&Hasta=${encodeURIComponent(hasta)}`;
     logDebug(`GET ${url}`);
     const res = await fetch(url, {headers:{'Accept':'application/json'}, cache:'no-store'});
     const text = await res.text();
