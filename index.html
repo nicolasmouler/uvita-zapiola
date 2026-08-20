@@ -235,14 +235,15 @@
       El monto de cada cuota es el que figura como <strong>"Cuota Total"</strong> en la tabla de amortización
       (capital + interés neto de subsidio + rubros + IVA), multiplicado por el valor UVA real del día exacto de
       vencimiento (esa fecha ya viene ajustada por el banco al día hábil más cercano al 10 cuando corresponde).
-      El valor UVA de cada cuota ya vencida se trae automáticamente de la
-      <strong>API pública oficial del BCRA</strong> (variable 31). Si por algún motivo no se puede consultar, se usa
-      una estimación de respaldo, marcada como tal. Podés sobrescribir cualquier valor a mano si hace falta — ese
-      valor manual siempre tiene prioridad.
+      El valor UVA se trae automáticamente de la <strong>API pública oficial del BCRA</strong> (variable 31),
+      incluyendo las cuotas futuras cuyo valor el BCRA ya haya publicado por anticipado (suele calcularlo con
+      semanas o meses de adelanto). Si por algún motivo no se puede consultar, se usa una estimación de respaldo,
+      marcada como tal. Podés sobrescribir cualquier valor a mano si hace falta — ese valor manual siempre tiene
+      prioridad.
       Marcá cada cuota como <strong>pagada</strong> con el check de la tabla a medida que las vayas abonando —
       queda guardado y el dashboard reordena sola cuál es la próxima a vencer.
-      Las cuotas futuras (todavía no vencidas) se muestran <span class="est">proyectadas</span> con la inflación
-      mensual de arriba, ya que el BCRA todavía no publicó esos valores.
+      Las cuotas futuras cuyo valor UVA el BCRA todavía no publicó se muestran <span class="est">proyectadas</span>
+      con la inflación mensual de arriba.
     </small>
   </div>
 </section>
@@ -473,8 +474,13 @@ async function fetchBcraUva(){
   logDebug('Consultando valores UVA oficiales del BCRA (variable 31)...');
   try{
     // La API pide formato date-time completo (no solo YYYY-MM-DD).
+    // "Hasta" pide bastante más allá de hoy: el BCRA publica la UVA con semanas/meses de
+    // anticipación (hoy la tiene calculada, por ejemplo, hasta mediados de septiembre), así que
+    // conviene traer todo lo que ya esté disponible en vez de cortar justo en la fecha de hoy.
     const desde = VIGENCIA_INICIO_ISO + 'T00:00:00';
-    const hasta = todayIso() + 'T00:00:00';
+    const hastaDate = new Date(TODAY);
+    hastaDate.setDate(hastaDate.getDate() + 180);
+    const hasta = hastaDate.toISOString().slice(0,10) + 'T00:00:00';
     const url = `https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias/31?Desde=${encodeURIComponent(desde)}&Hasta=${encodeURIComponent(hasta)}`;
     logDebug(`GET ${url}`);
     const res = await fetch(url, {headers:{'Accept':'application/json'}, cache:'no-store'});
@@ -488,7 +494,8 @@ async function fetchBcraUva(){
     const detalle = (data.results && data.results[0] && data.results[0].detalle) || [];
     detalle.forEach(d => { bcraCache[d.fecha] = d.valor; });
     bcraStatus = 'ok';
-    logDebug(`BCRA UVA: ${detalle.length} valor(es) recibidos (${VIGENCIA_INICIO_ISO} a ${todayIso()})`);
+    const ultimaFecha = detalle.length ? detalle[detalle.length-1].fecha : null;
+    logDebug(`BCRA UVA: ${detalle.length} valor(es) recibidos (${VIGENCIA_INICIO_ISO} a ${ultimaFecha || todayIso()})`);
     renderAll();
   }catch(err){
     bcraStatus = 'error';
