@@ -472,16 +472,23 @@ async function fetchBcraUva(){
   updateBcraStatusUI();
   logDebug('Consultando valores UVA oficiales del BCRA (serie 7913)...');
   try{
-    const desde = VIGENCIA_INICIO_ISO;
-    const hasta = todayIso();
-    const url = `https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias/7913?Desde=${desde}&Hasta=${hasta}`;
+    // La API pide formato date-time completo (no solo YYYY-MM-DD).
+    const desde = VIGENCIA_INICIO_ISO + 'T00:00:00';
+    const hasta = todayIso() + 'T00:00:00';
+    const url = `https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias/7913?Desde=${encodeURIComponent(desde)}&Hasta=${encodeURIComponent(hasta)}`;
+    logDebug(`GET ${url}`);
     const res = await fetch(url, {headers:{'Accept':'application/json'}, cache:'no-store'});
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
+    const text = await res.text();
+    let data = null;
+    try{ data = JSON.parse(text); }catch(e){ /* respuesta no era JSON */ }
+    if(!res.ok){
+      const msg = (data && data.errorMessages && data.errorMessages.join('; ')) || text.slice(0,200) || ('HTTP ' + res.status);
+      throw new Error(`HTTP ${res.status} — ${msg}`);
+    }
     const detalle = (data.results && data.results[0] && data.results[0].detalle) || [];
     detalle.forEach(d => { bcraCache[d.fecha] = d.valor; });
     bcraStatus = 'ok';
-    logDebug(`BCRA UVA: ${detalle.length} valor(es) recibidos (${desde} a ${hasta})`);
+    logDebug(`BCRA UVA: ${detalle.length} valor(es) recibidos (${VIGENCIA_INICIO_ISO} a ${todayIso()})`);
     renderAll();
   }catch(err){
     bcraStatus = 'error';
