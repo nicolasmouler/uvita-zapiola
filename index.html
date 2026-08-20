@@ -69,6 +69,9 @@
   input[type=number]:focus, input[type=text]:focus, input[type=date]:focus, select:focus{outline:1px solid var(--accent);}
   input[type=checkbox]{width:17px;height:17px;accent-color:var(--good);cursor:pointer;}
   .pill.penalty{background:rgba(224,97,107,.18);color:var(--bad);}
+  .pill.src-oficial{background:rgba(76,187,135,.18);color:var(--good);}
+  .pill.src-estimado{background:rgba(231,163,62,.18);color:var(--warn);}
+  .pill.src-proyectado{background:rgba(91,141,239,.18);color:var(--accent2);}
   .pill.nopenalty{background:rgba(76,187,135,.18);color:var(--good);}
   .delBtn{background:transparent;border:1px solid var(--border);color:var(--muted);
     border-radius:6px;padding:3px 8px;font-size:.72rem;cursor:pointer;}
@@ -238,8 +241,8 @@
       El valor UVA se trae automáticamente de la <strong>API pública oficial del BCRA</strong> (variable 31),
       incluyendo las cuotas futuras cuyo valor el BCRA ya haya publicado por anticipado (suele calcularlo con
       semanas o meses de adelanto). Si por algún motivo no se puede consultar, se usa una estimación de respaldo,
-      marcada como tal. Podés sobrescribir cualquier valor a mano si hace falta — ese valor manual siempre tiene
-      prioridad.
+      marcada como tal. Podés sobrescribir cualquier valor a mano si hace falta, pero queda como estimación
+      provisoria: apenas el BCRA publique el dato oficial de esa fecha, lo reemplaza automáticamente.
       Marcá cada cuota como <strong>pagada</strong> con el check de la tabla a medida que las vayas abonando —
       queda guardado y el dashboard reordena sola cuál es la próxima a vencer.
       Las cuotas futuras cuyo valor UVA el BCRA todavía no publicó se muestran <span class="est">proyectadas</span>
@@ -293,6 +296,7 @@
       <div class="field">
         <label>Valor UVA en ese momento</label>
         <input type="number" id="adelantoValorUva" step="0.01" placeholder="ej: 2080.50">
+        <span class="src" id="adelantoValorUvaSrc" style="margin-top:3px;"></span>
       </div>
       <div class="field">
         <label>Aplicado a</label>
@@ -330,6 +334,11 @@
         <label>Buscar cuota N.º o mes</label>
         <input type="text" id="filterInput" placeholder="ej: 5 o 2027-03">
       </div>
+    </div>
+    <div class="caplegend" style="justify-content:flex-start;margin:0 0 10px;">
+      <span class="item"><span class="pill src-oficial">Oficial (BCRA)</span> valor real publicado por el BCRA</span>
+      <span class="item"><span class="pill src-estimado">Estimado</span> a mano o interpolado — se pisa solo cuando el BCRA publica el real</span>
+      <span class="item"><span class="pill src-proyectado">Proyectado</span> cuota futura, con inflación estimada</span>
     </div>
     <div class="tablewrap">
       <table>
@@ -440,9 +449,11 @@ function lastKnownAnchor(){
 }
 
 function getUvaFor(iso){
-  if(userValues[iso]) return {valor:userValues[iso].valor, source:'confirmado', estimated:false};
+  // El BCRA manda siempre que tenga el dato oficial: un valor cargado a mano es una estimación
+  // provisoria, no una verdad definitiva, así que se pisa sola apenas el BCRA publica el real.
   if(bcraCache[iso] != null) return {valor:bcraCache[iso], source:'oficial (BCRA)', estimated:false};
-  if(SEED_UVA[iso]) return {valor:SEED_UVA[iso], source:'referencia web', estimated:false};
+  if(userValues[iso]) return {valor:userValues[iso].valor, source:'estimado (manual)', estimated:true};
+  if(SEED_UVA[iso]) return {valor:SEED_UVA[iso], source:'referencia web', estimated:true};
   if(iso <= todayIso()){
     return {valor: nearestSeedValue(iso), source:'estimado (interpolado)', estimated:true};
   }
@@ -707,6 +718,17 @@ function renderAdelantos(){
   });
 }
 
+document.getElementById('adelantoFecha').addEventListener('change', e=>{
+  const iso = e.target.value;
+  const uvaInput = document.getElementById('adelantoValorUva');
+  const srcEl = document.getElementById('adelantoValorUvaSrc');
+  if(!iso){ srcEl.textContent = ''; return; }
+  const {valor, source, estimated} = getUvaFor(iso);
+  uvaInput.value = valor.toFixed(2);
+  srcEl.textContent = source;
+  srcEl.className = 'src ' + (estimated ? 'est' : 'conf');
+});
+
 document.getElementById('addAdelantoBtn').addEventListener('click', ()=>{
   const fecha = document.getElementById('adelantoFecha').value;
   const montoPesos = parseFloat(document.getElementById('adelantoMontoPesos').value);
@@ -959,6 +981,15 @@ function renderCapitalInteresCharts(){
       Restante: <b>${uvaFmt(int.restante)} UVA</b> (${money(int.restante*uvaHoy)})</div>`;
 }
 
+function sourceBadge(source){
+  if(source === 'oficial (BCRA)') return {label:'Oficial (BCRA)', cls:'src-oficial'};
+  if(source === 'estimado (manual)') return {label:'Estimado (manual)', cls:'src-estimado'};
+  if(source === 'estimado (interpolado)') return {label:'Estimado', cls:'src-estimado'};
+  if(source && source.startsWith('proyectado')) return {label:'Proyectado', cls:'src-proyectado'};
+  if(source === 'referencia web') return {label:'Referencia', cls:'src-estimado'};
+  return {label:source || '—', cls:'src-estimado'};
+}
+
 function rowHtml(r){
   const cancelled = isCancelled(r.n);
   if(cancelled){
@@ -992,7 +1023,7 @@ function rowHtml(r){
         <input type="number" step="0.01" class="uvaInput" data-iso="${r.fecha}" value="${valor.toFixed(2)}" style="width:100px">
       </td>
       <td class="num amtcell">${money(pesos)}</td>
-      <td class="src ${estimated?'est':'conf'}">${source}</td>
+      <td class="src ${estimated?'est':'conf'}"><span class="pill ${sourceBadge(source).cls}">${sourceBadge(source).label}</span></td>
     </tr>`;
 }
 
