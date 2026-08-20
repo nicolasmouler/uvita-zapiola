@@ -62,12 +62,17 @@
   .uvarow{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
   .field{display:flex;flex-direction:column;gap:4px;}
   .field label{font-size:.72rem;color:var(--muted);}
-  input[type=number], input[type=text]{
+  input[type=number], input[type=text], input[type=date], select{
     background:var(--panel2);border:1px solid var(--border);color:var(--text);
     border-radius:8px;padding:7px 9px;font-size:.85rem;width:130px;
   }
-  input[type=number]:focus, input[type=text]:focus{outline:1px solid var(--accent);}
+  input[type=number]:focus, input[type=text]:focus, input[type=date]:focus, select:focus{outline:1px solid var(--accent);}
   input[type=checkbox]{width:17px;height:17px;accent-color:var(--good);cursor:pointer;}
+  .pill.penalty{background:rgba(224,97,107,.18);color:var(--bad);}
+  .pill.nopenalty{background:rgba(76,187,135,.18);color:var(--good);}
+  .delBtn{background:transparent;border:1px solid var(--border);color:var(--muted);
+    border-radius:6px;padding:3px 8px;font-size:.72rem;cursor:pointer;}
+  .delBtn:hover{color:var(--bad);border-color:var(--bad);}
   button{
     background:var(--accent);color:#08201c;border:none;border-radius:8px;
     padding:8px 14px;font-size:.82rem;font-weight:700;cursor:pointer;
@@ -261,6 +266,59 @@
 <section>
   <div class="panel">
     <div class="flexhead">
+      <h3>💰 Adelantos de pago</h3>
+    </div>
+    <small class="note">
+      Los adelantos hechos dentro de los primeros 5 años del crédito (antes del 23/06/2031) llevan una
+      penalidad del 3% sobre el monto adelantado. La reducción de cuotas es una estimación: asume que la cuota
+      mensual en UVA se mantiene igual a la del momento del adelanto y aplica la fórmula estándar del sistema
+      francés — el banco puede recalcular con criterios levemente distintos.
+    </small>
+
+    <div class="uvarow" style="margin-top:12px;">
+      <div class="field">
+        <label>Fecha del adelanto</label>
+        <input type="date" id="adelantoFecha">
+      </div>
+      <div class="field">
+        <label>Monto adelantado ($)</label>
+        <input type="number" id="adelantoMontoPesos" step="0.01" placeholder="ej: 500000">
+      </div>
+      <div class="field">
+        <label>Valor UVA en ese momento</label>
+        <input type="number" id="adelantoValorUva" step="0.01" placeholder="ej: 2080.50">
+      </div>
+      <div class="field">
+        <label>Aplicado a</label>
+        <select id="adelantoTipo">
+          <option value="capital">Capital</option>
+          <option value="interes">Intereses</option>
+        </select>
+      </div>
+      <button id="addAdelantoBtn">Agregar adelanto</button>
+    </div>
+
+    <div class="grid" id="adelantoKpis" style="margin-top:16px;"></div>
+
+    <div class="tablewrap" style="margin-top:14px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th><th>Aplicado a</th><th class="num">Monto ($)</th><th class="num">Monto (UVA)</th>
+            <th class="center">Penalidad 3%</th><th class="num">Costo total ($)</th>
+            <th class="num">Reducción de cuotas</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="adelantoTbody"></tbody>
+      </table>
+    </div>
+    <small class="note" id="adelantoEmptyNote">Todavía no cargaste ningún adelanto de pago.</small>
+  </div>
+</section>
+
+<section>
+  <div class="panel">
+    <div class="flexhead">
       <h3>📋 Plan de cuotas completo (240 meses)</h3>
       <div class="field">
         <label>Buscar cuota N.º o mes</label>
@@ -306,6 +364,7 @@ const todayIso = () => TODAY.toISOString().slice(0,10);
 
 let userValues = {};  // { iso: {valor} }        -> valores UVA cargados por el usuario
 let paidState  = {};  // { n: true|false }        -> estado de pago editable por el usuario
+let adelantos  = {};  // { id: {fecha, montoPesos, valorUva, montoUva, tipo, penalidad} } -> adelantos de pago
 
 // Adaptador de almacenamiento: usa el storage de Claude si está disponible (dentro de claude.ai),
 // y si no (por ejemplo cuando el archivo se abre directo desde WhatsApp/el celular) usa localStorage
@@ -412,6 +471,15 @@ function loadStorage(){
         paidState[n] = r.value === 'true';
       }
     }).catch(()=>{})));
+  }).catch(()=>{})
+  .then(()=> storage.list('adelanto:', false)).then(res=>{
+    const keys = (res && res.keys) || [];
+    return Promise.all(keys.map(k => storage.get(k, false).then(r=>{
+      if(r && r.value){
+        const id = k.replace('adelanto:','');
+        try{ adelantos[id] = JSON.parse(r.value); }catch(e){}
+      }
+    }).catch(()=>{})));
   }).catch(()=>{});
 }
 
@@ -433,6 +501,144 @@ function savePaid(n, value){
     .then(()=>{ lastSyncTs = new Date(); updateSyncStatus(); showToast(base + ' y sincronizada ✓'); })
     .catch(err=>{ logDebug(`❌ Error guardando paid/${n}: ${err.message||err}`); showToast(base + ' — no se pudo sincronizar'); });
 }
+
+// ---------- Adelantos de pago ----------
+const VIGENCIA_INICIO_ISO = '2026-06-23';
+const PENALTY_LIMIT_ISO = '2031-06-23'; // vigencia + 5 años
+const TEM = (9.5/12)/100; // tasa efectiva mensual a partir de la TNA del crédito
+
+function aplicaPenalidad(fechaIso){
+  return fechaIso < PENALTY_LIMIT_ISO;
+}
+
+function saveAdelanto(id, obj){
+  adelantos[id] = obj;
+  storage.set('adelanto:'+id, JSON.stringify(obj), false).catch(()=>{});
+  if(!fbRef){ showToast('Adelanto guardado en este dispositivo (sin conexión a la nube)'); return Promise.resolve(); }
+  return fbRef.child('adelantos/'+id).set(obj)
+    .then(()=>{ lastSyncTs = new Date(); updateSyncStatus(); showToast('Adelanto agregado y sincronizado ✓'); })
+    .catch(err=>{ logDebug(`❌ Error guardando adelanto/${id}: ${err.message||err}`); showToast('Guardado en este dispositivo — no se pudo sincronizar'); });
+}
+
+function deleteAdelanto(id){
+  delete adelantos[id];
+  storage.delete('adelanto:'+id, false).catch(()=>{});
+  const cloud = fbRef ? fbRef.child('adelantos/'+id).remove().catch(()=>{}) : Promise.resolve();
+  return cloud.then(()=>{ renderAll(); showToast('Adelanto eliminado' + (fbRef?' (local y nube)':'')); });
+}
+
+function findRowAtOrAfter(fechaIso){
+  return DATA.find(r => r.fecha >= fechaIso) || DATA[DATA.length-1];
+}
+
+// Reducción de cuotas por un adelanto de capital: como la cuota y la tasa de las cuotas
+// restantes no cambian, adelantar capital simplemente "cancela" esa plata contra las ÚLTIMAS
+// cuotas del cronograma (el crédito termina antes en vez de pagar cuotas más bajas).
+// Usamos directamente la columna de capital real de la tabla de amortización — no la fórmula
+// clásica del sistema francés, que acá no aplica porque el crédito tiene subsidio (la cuota que
+// se paga es menor que el interés puro sobre el saldo).
+// "cuotasYaReducidas" son las que ya "canceló" algún adelanto de capital anterior (en orden
+// cronológico), para no contar la misma reducción dos veces.
+function calcReduccionCuotas(montoUva, cuotasYaReducidas){
+  let disponible = montoUva;
+  let k = 0;
+  let idx = DATA.length - 1 - cuotasYaReducidas; // 0-based, última cuota restante del cronograma virtual
+  while(disponible > 0 && idx >= 0){
+    disponible -= DATA[idx].capital;
+    k++;
+    idx--;
+  }
+  return k;
+}
+
+function renderAdelantos(){
+  const tbody = document.getElementById('adelantoTbody');
+  const kpisEl = document.getElementById('adelantoKpis');
+  const emptyNote = document.getElementById('adelantoEmptyNote');
+  if(!tbody) return;
+
+  const list = Object.keys(adelantos)
+    .map(id => ({id, ...adelantos[id]}))
+    .sort((a,b) => a.fecha < b.fecha ? -1 : (a.fecha > b.fecha ? 1 : 0));
+
+  let cuotasYaReducidas = 0;
+  let totalPesos = 0, totalPenalidadPesos = 0, totalReduccion = 0, reduccionIncierta = false;
+
+  const rows = list.map(a=>{
+    let reduccion = null;
+    if(a.tipo === 'capital'){
+      reduccion = calcReduccionCuotas(a.montoUva, cuotasYaReducidas);
+      cuotasYaReducidas += reduccion;
+      if(reduccion == null) reduccionIncierta = true;
+      else totalReduccion += reduccion;
+    }
+    totalPesos += a.montoPesos;
+    if(a.penalidad) totalPenalidadPesos += a.montoPesos*0.03;
+    return {...a, reduccion};
+  });
+
+  emptyNote.style.display = list.length ? 'none' : 'block';
+
+  tbody.innerHTML = rows.map(a=>{
+    const costoTotal = a.montoPesos * (a.penalidad ? 1.03 : 1);
+    return `
+    <tr>
+      <td>${fmtDate(a.fecha)}</td>
+      <td>${a.tipo === 'capital' ? 'Capital' : 'Intereses'}</td>
+      <td class="num">${money(a.montoPesos)}</td>
+      <td class="num">${uvaFmt(a.montoUva)}</td>
+      <td class="center"><span class="pill ${a.penalidad?'penalty':'nopenalty'}">${a.penalidad ? 'Sí (3%)' : 'No'}</span></td>
+      <td class="num">${money(costoTotal)}</td>
+      <td class="num">${a.tipo === 'capital' ? (a.reduccion==null ? '—' : a.reduccion + ' cuota(s)') : 'No aplica'}</td>
+      <td class="center"><button class="delBtn" data-delid="${a.id}">Eliminar</button></td>
+    </tr>`;
+  }).join('');
+
+  const cur = currentInstallment();
+  const cuotasRestantesOriginal = DATA.length - cur.n + 1;
+  const cuotasRestantesEstimadas = Math.max(0, cuotasRestantesOriginal - totalReduccion);
+  const finalIdx = Math.max(0, DATA.length - 1 - totalReduccion);
+  const nuevaFechaFinal = totalReduccion > 0 ? DATA[finalIdx].fecha : DATA[DATA.length-1].fecha;
+
+  const kpis = [
+    {label:'Total adelantado', value: money(totalPesos), sub: `${list.length} adelanto(s) cargado(s)`},
+    {label:'Total pagado en penalidades', value: money(totalPenalidadPesos), sub: 'por adelantos dentro de los primeros 5 años'},
+    {label:'Reducción estimada de cuotas', value: `${totalReduccion} cuota(s)`, sub: reduccionIncierta ? 'estimación parcial — algún caso no convergió' : 'sobre adelantos de capital'},
+    {label:'Nuevo vencimiento estimado', value: fmtDate(nuevaFechaFinal), sub: `${cuotasRestantesEstimadas} cuota(s) restantes (antes ${cuotasRestantesOriginal})`},
+  ];
+  kpisEl.innerHTML = kpis.map(k=>`
+    <div class="card">
+      <div class="label">${k.label}</div>
+      <div class="value">${k.value}</div>
+      <div class="sub">${k.sub}</div>
+    </div>`).join('');
+
+  tbody.querySelectorAll('.delBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=> deleteAdelanto(btn.dataset.delid));
+  });
+}
+
+document.getElementById('addAdelantoBtn').addEventListener('click', ()=>{
+  const fecha = document.getElementById('adelantoFecha').value;
+  const montoPesos = parseFloat(document.getElementById('adelantoMontoPesos').value);
+  const valorUva = parseFloat(document.getElementById('adelantoValorUva').value);
+  const tipo = document.getElementById('adelantoTipo').value;
+
+  if(!fecha || !montoPesos || montoPesos <= 0 || !valorUva || valorUva <= 0){
+    showToast('Completá fecha, monto y valor UVA para agregar el adelanto');
+    return;
+  }
+  const montoUva = montoPesos / valorUva;
+  const penalidad = aplicaPenalidad(fecha);
+  const id = 'a' + Date.now();
+  const obj = {fecha, montoPesos, valorUva, montoUva, tipo, penalidad};
+
+  saveAdelanto(id, obj).then(()=>{
+    document.getElementById('adelantoMontoPesos').value = '';
+    document.getElementById('adelantoValorUva').value = '';
+    renderAll();
+  });
+});
 
 // ---------- Sincronización en tiempo real (Firebase Realtime Database) ----------
 // Todas las copias de este archivo apuntan al mismo proyecto de Firebase, así que
@@ -517,6 +723,16 @@ function initFirebaseSync(){
       logDebug(`paid/ actualizado → ${Object.keys(data).length} clave(s)`);
       if(changed) renderAll(); else updateSyncStatus();
     }, err=>{ logDebug(`❌ Error escuchando paid/: ${err.message||err}`); updateSyncStatus(); });
+
+    fbRef.child('adelantos').on('value', snap=>{
+      const data = snap.val() || {};
+      let changed = JSON.stringify(Object.keys(data).sort()) !== JSON.stringify(Object.keys(adelantos).sort())
+        || JSON.stringify(data) !== JSON.stringify(adelantos);
+      adelantos = data;
+      lastSyncTs = new Date();
+      logDebug(`adelantos/ actualizado → ${Object.keys(data).length} registro(s)`);
+      if(changed) renderAll(); else updateSyncStatus();
+    }, err=>{ logDebug(`❌ Error escuchando adelantos/: ${err.message||err}`); updateSyncStatus(); });
 
   }catch(err){
     logDebug(`❌ Error inicializando Firebase: ${err.message||err}`);
@@ -757,6 +973,7 @@ function renderAll(){
   renderHero();
   renderKpis();
   renderCapitalInteresCharts();
+  renderAdelantos();
 }
 
 async function init(){
