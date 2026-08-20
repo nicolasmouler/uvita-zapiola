@@ -449,8 +449,12 @@ function isPaid(n){
   return rec ? rec.estado === 'CANCELADA' : false;
 }
 
+function isCancelled(n){
+  return adelantosSummary.cancelledSet.has(n);
+}
+
 function currentInstallment(){
-  return DATA.find(r => !isPaid(r.n)) || DATA[DATA.length-1];
+  return DATA.find(r => !isPaid(r.n) && !isCancelled(r.n)) || DATA[DATA.length-1];
 }
 
 function loadStorage(){
@@ -551,33 +555,56 @@ function calcReduccionCuotas(montoUva, cuotasYaReducidas){
   return k;
 }
 
-function renderAdelantos(){
-  const tbody = document.getElementById('adelantoTbody');
-  const kpisEl = document.getElementById('adelantoKpis');
-  const emptyNote = document.getElementById('adelantoEmptyNote');
-  if(!tbody) return;
+let adelantosSummary = {
+  rows: [], totalPesos: 0, totalPenalidadPesos: 0, totalReduccion: 0,
+  totalCapitalAdelantadoUva: 0, totalInteresAdelantadoUva: 0,
+  cancelledSet: new Set()
+};
 
+// Única fuente de verdad para el efecto de los adelantos: se recalcula al principio de cada
+// renderAll() y de acá leen tanto la sección de adelantos como la tabla de cuotas y los anillos.
+function computeAdelantosSummary(){
   const list = Object.keys(adelantos)
     .map(id => ({id, ...adelantos[id]}))
     .sort((a,b) => a.fecha < b.fecha ? -1 : (a.fecha > b.fecha ? 1 : 0));
 
   let cuotasYaReducidas = 0;
-  let totalPesos = 0, totalPenalidadPesos = 0, totalReduccion = 0, reduccionIncierta = false;
+  let totalPesos = 0, totalPenalidadPesos = 0, totalReduccion = 0;
+  let totalCapitalAdelantadoUva = 0, totalInteresAdelantadoUva = 0;
 
   const rows = list.map(a=>{
     let reduccion = null;
     if(a.tipo === 'capital'){
       reduccion = calcReduccionCuotas(a.montoUva, cuotasYaReducidas);
       cuotasYaReducidas += reduccion;
-      if(reduccion == null) reduccionIncierta = true;
-      else totalReduccion += reduccion;
+      totalReduccion += reduccion;
+      totalCapitalAdelantadoUva += a.montoUva;
+    } else {
+      totalInteresAdelantadoUva += a.montoUva;
     }
     totalPesos += a.montoPesos;
     if(a.penalidad) totalPenalidadPesos += a.montoPesos*0.03;
     return {...a, reduccion};
   });
 
-  emptyNote.style.display = list.length ? 'none' : 'block';
+  const cancelledSet = new Set();
+  for(let i = DATA.length - 1; i >= DATA.length - totalReduccion; i--){
+    if(i < 0) break;
+    cancelledSet.add(DATA[i].n);
+  }
+
+  adelantosSummary = {rows, totalPesos, totalPenalidadPesos, totalReduccion,
+    totalCapitalAdelantadoUva, totalInteresAdelantadoUva, cancelledSet};
+}
+
+function renderAdelantos(){
+  const tbody = document.getElementById('adelantoTbody');
+  const kpisEl = document.getElementById('adelantoKpis');
+  const emptyNote = document.getElementById('adelantoEmptyNote');
+  if(!tbody) return;
+
+  const {rows, totalPesos, totalPenalidadPesos, totalReduccion} = adelantosSummary;
+  emptyNote.style.display = rows.length ? 'none' : 'block';
 
   tbody.innerHTML = rows.map(a=>{
     const costoTotal = a.montoPesos * (a.penalidad ? 1.03 : 1);
@@ -589,7 +616,7 @@ function renderAdelantos(){
       <td class="num">${uvaFmt(a.montoUva)}</td>
       <td class="center"><span class="pill ${a.penalidad?'penalty':'nopenalty'}">${a.penalidad ? 'Sí (3%)' : 'No'}</span></td>
       <td class="num">${money(costoTotal)}</td>
-      <td class="num">${a.tipo === 'capital' ? (a.reduccion==null ? '—' : a.reduccion + ' cuota(s)') : 'No aplica'}</td>
+      <td class="num">${a.tipo === 'capital' ? a.reduccion + ' cuota(s)' : 'No aplica'}</td>
       <td class="center"><button class="delBtn" data-delid="${a.id}">Eliminar</button></td>
     </tr>`;
   }).join('');
@@ -601,9 +628,9 @@ function renderAdelantos(){
   const nuevaFechaFinal = totalReduccion > 0 ? DATA[finalIdx].fecha : DATA[DATA.length-1].fecha;
 
   const kpis = [
-    {label:'Total adelantado', value: money(totalPesos), sub: `${list.length} adelanto(s) cargado(s)`},
+    {label:'Total adelantado', value: money(totalPesos), sub: `${rows.length} adelanto(s) cargado(s)`},
     {label:'Total pagado en penalidades', value: money(totalPenalidadPesos), sub: 'por adelantos dentro de los primeros 5 años'},
-    {label:'Reducción estimada de cuotas', value: `${totalReduccion} cuota(s)`, sub: reduccionIncierta ? 'estimación parcial — algún caso no convergió' : 'sobre adelantos de capital'},
+    {label:'Reducción estimada de cuotas', value: `${totalReduccion} cuota(s)`, sub: 'sobre adelantos de capital, ya reflejado abajo'},
     {label:'Nuevo vencimiento estimado', value: fmtDate(nuevaFechaFinal), sub: `${cuotasRestantesEstimadas} cuota(s) restantes (antes ${cuotasRestantesOriginal})`},
   ];
   kpisEl.innerHTML = kpis.map(k=>`
@@ -787,20 +814,23 @@ function renderHero(){
 }
 
 function renderKpis(){
-  const pagadas = DATA.filter(r=>isPaid(r.n)).length;
-  const last = DATA[DATA.length-1];
+  const pagadas = DATA.filter(r=>isPaid(r.n) && !isCancelled(r.n)).length;
+  const totalReduccion = adelantosSummary.totalReduccion;
+  const cuotasVigentes = DATA.length - totalReduccion;
+  const finalIdx = Math.max(0, DATA.length - 1 - totalReduccion);
+  const last = DATA[finalIdx];
   const cur = currentInstallment();
-  const saldoUva = cur.saldoCap;
-  const refDate = todayIso() <= last.fecha ? todayIso() : last.fecha;
+  const saldoUva = Math.max(0, cur.saldoCap - adelantosSummary.totalCapitalAdelantadoUva);
+  const refDate = todayIso() <= DATA[DATA.length-1].fecha ? todayIso() : DATA[DATA.length-1].fecha;
   const {valor: uvaHoy} = getUvaFor(refDate);
   const saldoPesos = saldoUva * uvaHoy;
-  const progreso = ((pagadas/DATA.length)*100).toFixed(1);
+  const progreso = ((pagadas/cuotasVigentes)*100).toFixed(1);
 
   const kpis = [
-    {label:'Cuotas pagadas', value:`${pagadas} / ${DATA.length}`, sub:`${progreso}% del plazo`},
+    {label:'Cuotas pagadas', value:`${pagadas} / ${cuotasVigentes}`, sub: totalReduccion>0 ? `${progreso}% del plazo · +${totalReduccion} canceladas por adelanto` : `${progreso}% del plazo`},
     {label:'Saldo de capital', value:`${uvaFmt(saldoUva)} UVA`, sub:`≈ ${money(saldoPesos)} hoy`},
     {label:'Valor UVA de referencia hoy', value:`$${uvaFmt(uvaHoy)}`, sub:`al ${fmtDate(todayIso())}`},
-    {label:'Vencimiento final', value:fmtDate(last.fecha), sub:`cuota N.º ${last.n}`},
+    {label:'Vencimiento final', value:fmtDate(last.fecha), sub: totalReduccion>0 ? `cuota N.º ${last.n} (adelantado)` : `cuota N.º ${last.n}`},
   ];
   document.getElementById('kpis').innerHTML = kpis.map(k=>`
     <div class="card">
@@ -811,9 +841,29 @@ function renderKpis(){
 }
 
 function totalsFor(field){
+  // Cuotas pagadas normalmente (sin contar las que quedaron canceladas por un adelanto,
+  // para no sumarlas dos veces).
+  const pagadoCuotas = DATA.filter(r => isPaid(r.n) && !isCancelled(r.n)).reduce((s,r)=>s+r[field],0);
+
+  if(field === 'capital'){
+    // El total de capital no cambia (es el monto original del crédito); un adelanto de capital
+    // simplemente lo da por pagado antes de tiempo.
+    const total = DATA.reduce((s,r)=>s+r.capital,0);
+    const pagado = pagadoCuotas + adelantosSummary.totalCapitalAdelantadoUva;
+    return {total, pagado, restante: Math.max(0, total - pagado)};
+  }
+
+  if(field === 'interes'){
+    // El interés de las cuotas canceladas por un adelanto nunca llega a devengarse: se resta
+    // del total en vez de sumarse como "pagado".
+    const interesCancelado = DATA.filter(r=>isCancelled(r.n)).reduce((s,r)=>s+r.interes,0);
+    const total = DATA.reduce((s,r)=>s+r.interes,0) - interesCancelado;
+    const pagado = pagadoCuotas + adelantosSummary.totalInteresAdelantadoUva;
+    return {total, pagado, restante: Math.max(0, total - pagado)};
+  }
+
   const total = DATA.reduce((s,r)=>s+r[field],0);
-  const pagado = DATA.filter(r=>isPaid(r.n)).reduce((s,r)=>s+r[field],0);
-  return {total, pagado, restante: total - pagado};
+  return {total, pagado: pagadoCuotas, restante: total - pagadoCuotas};
 }
 
 function paintDonut(donutId, labelId, pagado, total, colorPagado){
@@ -848,6 +898,20 @@ function renderCapitalInteresCharts(){
 }
 
 function rowHtml(r){
+  const cancelled = isCancelled(r.n);
+  if(cancelled){
+    return `
+    <tr class="paid" data-n="${r.n}" data-month="${r.fecha.slice(0,7)}">
+      <td class="center">—</td>
+      <td>${r.n}</td>
+      <td>${fmtDate(r.fecha)}</td>
+      <td><span class="pill nopenalty">Cancelada (adelanto)</span></td>
+      <td class="num">${uvaFmt(r.cuotaUva)}</td>
+      <td class="num">—</td>
+      <td class="num amtcell">$0</td>
+      <td class="src">cubierta por adelanto de capital</td>
+    </tr>`;
+  }
   const paid = isPaid(r.n);
   const cur = currentInstallment();
   const isCurrent = !paid && r.n === cur.n;
@@ -969,6 +1033,7 @@ document.getElementById('filterInput').addEventListener('input', e=>{
 });
 
 function renderAll(){
+  computeAdelantosSummary();
   renderTable();
   renderHero();
   renderKpis();
